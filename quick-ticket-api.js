@@ -1,5 +1,5 @@
 // Google Apps Script Web App URL - REPLACE WITH YOUR DEPLOYED URL
-const API_URL = "YOUR_GOOGLE_APPS_SCRIPT_URL";
+const API_URL = "https://script.google.com/macros/s/AKfycbz2hmmAZkgHbkjF2gZuurJCtOUvTQhTZR-v09ja924YHXerNcwy61XArp51x2DMPxSD/exec";
 
 // DB_KEYS - using Google Sheets via API
 const DB_KEYS = {
