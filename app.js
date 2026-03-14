@@ -71,11 +71,20 @@ function saveAssignmentHistory() {
 
 // Get the next agent in round-robin rotation
 function getNextAgent() {
+  // Reload agents from localStorage to ensure we have latest
+  const savedAgents = localStorage.getItem(DB_KEYS.AVAILABLE_AGENTS);
+  if (savedAgents) {
+    availableAgents = JSON.parse(savedAgents);
+  }
+  
+  console.log('Available agents:', availableAgents);
+  
   // Filter only active agents
   const activeAgents = availableAgents.filter(agent => agent.status === 'Active');
   
   if (activeAgents.length === 0) {
     console.warn('⚠️ No active agents available for assignment');
+    console.warn('Available agents count:', availableAgents.length);
     return null;
   }
 
