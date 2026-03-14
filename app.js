@@ -1,0 +1,1476 @@
+// ===== Self-Ticket Dashboard Application =====
+
+const DB_KEYS = {
+  TICKETS: 'selfTicket_tickets',
+  TRAINERS: 'selfTicket_trainers',
+  TICKET_COUNTER: 'selfTicket_counter',
+  ASSIGNMENT_HISTORY: 'selfTicket_assignment_history',
+  AGENT_ROTATION: 'selfTicket_agent_rotation',
+  AVAILABLE_AGENTS: 'selfTicket_available_agents'
+};
+
+let ticketsArray = [];
+let trainersArray = [
+  { id: 1, name: 'Alice Johnson', email: 'alice@company.com', status: 'Available', load: 0 },
+  { id: 2, name: 'Bob Smith', email: 'bob@company.com', status: 'Available', load: 0 },
+  { id: 3, name: 'Carol Williams', email: 'carol@company.com', status: 'Available', load: 0 }
+];
+
+// ===== Round-Robin Agent System =====
+// Available agents for round-robin assignment
+let availableAgents = [];
+
+// Current position in the rotation
+let rotationIndex = 0;
+
+// Assignment history for reporting
+let assignmentHistory = [];
+
+// Initialize the round-robin system
+function initializeRoundRobinSystem() {
+  // Load available agents from localStorage or use defaults
+  const savedAgents = localStorage.getItem(DB_KEYS.AVAILABLE_AGENTS);
+  if (savedAgents) {
+    availableAgents = JSON.parse(savedAgents);
+  } else {
+    // Default agents
+    availableAgents = [
+      { id: 1, email: 'alice@company.com', name: 'Alice Johnson', status: 'Active', assignedCount: 0 },
+      { id: 2, email: 'bob@company.com', name: 'Bob Smith', status: 'Active', assignedCount: 0 },
+      { id: 3, email: 'carol@company.com', name: 'Carol Williams', status: 'Active', assignedCount: 0 }
+    ];
+    saveAvailableAgents();
+  }
+
+  // Load rotation index
+  const savedIndex = localStorage.getItem(DB_KEYS.AGENT_ROTATION);
+  if (savedIndex) {
+    rotationIndex = parseInt(savedIndex, 10);
+  }
+
+  // Load assignment history
+  const savedHistory = localStorage.getItem(DB_KEYS.ASSIGNMENT_HISTORY);
+  if (savedHistory) {
+    assignmentHistory = JSON.parse(savedHistory);
+  }
+
+  console.log('✅ Round-Robin System initialized with', availableAgents.length, 'agents');
+  console.log('📋 Current rotation index:', rotationIndex);
+}
+
+// Save available agents to localStorage
+function saveAvailableAgents() {
+  localStorage.setItem(DB_KEYS.AVAILABLE_AGENTS, JSON.stringify(availableAgents));
+}
+
+// Save rotation index to localStorage
+function saveRotationIndex() {
+  localStorage.setItem(DB_KEYS.AGENT_ROTATION, rotationIndex.toString());
+}
+
+// Save assignment history to localStorage
+function saveAssignmentHistory() {
+  localStorage.setItem(DB_KEYS.ASSIGNMENT_HISTORY, JSON.stringify(assignmentHistory));
+}
+
+// Get the next agent in round-robin rotation
+function getNextAgent() {
+  // Filter only active agents
+  const activeAgents = availableAgents.filter(agent => agent.status === 'Active');
+  
+  if (activeAgents.length === 0) {
+    console.warn('⚠️ No active agents available for assignment');
+    return null;
+  }
+
+  // Get the next agent in rotation
+  const agent = activeAgents[rotationIndex % activeAgents.length];
+  
+  // Increment rotation index for next assignment
+  rotationIndex = (rotationIndex + 1) % activeAgents.length;
+  saveRotationIndex();
+
+  return agent;
+}
+
+// Add a new agent to the round-robin pool
+function addAgent(name, email) {
+  const newAgent = {
+    id: Date.now(),
+    email: email,
+    name: name,
+    status: 'Active',
+    assignedCount: 0,
+    addedAt: new Date().toISOString()
+  };
+  availableAgents.push(newAgent);
+  saveAvailableAgents();
+  console.log('✅ Agent added:', newAgent);
+  return newAgent;
+}
+
+// Remove an agent from the round-robin pool (set as inactive)
+function removeAgent(agentId) {
+  const agent = availableAgents.find(a => a.id === agentId);
+  if (agent) {
+    agent.status = 'Inactive';
+    agent.removedAt = new Date().toISOString();
+    saveAvailableAgents();
+    console.log('✅ Agent removed:', agent.email);
+    return true;
+  }
+  return false;
+}
+
+// Set agent availability status
+function setAgentStatus(agentId, status) {
+  const agent = availableAgents.find(a => a.id === agentId);
+  if (agent) {
+    agent.status = status;
+    agent.statusChangedAt = new Date().toISOString();
+    saveAvailableAgents();
+    console.log('✅ Agent status changed:', agent.email, '->', status);
+    return true;
+  }
+  return false;
+}
+
+// Reorder agents in rotation (move agent to front)
+function reorderRotation(agentId) {
+  const agentIndex = availableAgents.findIndex(a => a.id === agentId);
+  if (agentIndex > 0) {
+    const agent = availableAgents.splice(agentIndex, 1)[0];
+    availableAgents.unshift(agent);
+    rotationIndex = 0;
+    saveAvailableAgents();
+    saveRotationIndex();
+    console.log('✅ Rotation reordered, agent moved to front:', agent.email);
+    return true;
+  }
+  return false;
+}
+
+// Reset the rotation to start from the beginning
+function resetRotation() {
+  rotationIndex = 0;
+  saveRotationIndex();
+  console.log('✅ Rotation reset to beginning');
+}
+
+// Record an assignment in history
+function recordAssignment(ticket, agent) {
+  const record = {
+    id: Date.now(),
+    ticketId: ticket.id,
+    ticketDetails: {
+      mobileNumber: ticket.mobileNumber,
+      product: ticket.product,
+      priority: ticket.priority,
+      queryDescription: ticket.queryDescription
+    },
+    agentEmail: agent.email,
+    agentName: agent.name,
+    agentId: agent.id,
+    assignedAt: new Date().toISOString(),
+    method: 'Round-Robin'
+  };
+  assignmentHistory.push(record);
+  saveAssignmentHistory();
+
+  // Update agent's assigned count
+  agent.assignedCount++;
+  saveAvailableAgents();
+
+  console.log('✅ Assignment recorded:', record);
+  return record;
+}
+
+// Get assignment history with optional filters
+function getAssignmentHistory(filters = {}) {
+  let history = [...assignmentHistory];
+
+  if (filters.agentEmail) {
+    history = history.filter(r => r.agentEmail === filters.agentEmail);
+  }
+
+  if (filters.dateFrom) {
+    history = history.filter(r => new Date(r.assignedAt) >= new Date(filters.dateFrom));
+  }
+
+  if (filters.dateTo) {
+    history = history.filter(r => new Date(r.assignedAt) <= new Date(filters.dateTo));
+  }
+
+  // Sort by most recent first
+  history.sort((a, b) => new Date(b.assignedAt) - new Date(a.assignedAt));
+
+  return history;
+}
+
+// Get agent statistics
+function getAgentStats() {
+  return availableAgents.map(agent => ({
+    ...agent,
+    totalAssigned: agent.assignedCount || 0,
+    isActive: agent.status === 'Active'
+  }));
+}
+
+// Auto-assign ticket using round-robin
+function autoAssignTicket(ticket) {
+  const agent = getNextAgent();
+  
+  if (!agent) {
+    console.error('❌ Cannot assign ticket - no active agents available');
+    return null;
+  }
+
+  // Update ticket with assignment
+  ticket.assignedTrainer = agent.email;
+  ticket.assignedAgentName = agent.name;
+  ticket.assignedAgentId = agent.id;
+  ticket.assignedAt = new Date().toISOString();
+  ticket.assignmentMethod = 'Round-Robin';
+
+  // Record the assignment
+  recordAssignment(ticket, agent);
+
+  console.log('✅ Ticket auto-assigned:', ticket.id, '->', agent.email);
+  return agent;
+}
+
+// ===== Initialize Application =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadFromLocalStorage();
+  
+  // Initialize round-robin system
+  initializeRoundRobinSystem();
+  
+  // Update agent list in UI
+  updateAvailableAgentsList();
+  
+  // Create a test ticket creation button for debugging
+  const testButton = document.createElement('button');
+  testButton.textContent = 'Create Test Ticket';
+  testButton.style.cssText = 'position: fixed; top: 10px; right: 10px; z-index: 1000; background: red; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;';
+  testButton.addEventListener('click', () => {
+    ticketsArray = [
+      {
+        id: 'TKT-1001',
+        timestamp: new Date().toISOString(),
+        mobileNumber: '1234567890',
+        product: 'Test Product',
+        queryDescription: 'This is a test ticket for email functionality',
+        priority: 'High',
+        category: 'Test',
+        status: 'Open',
+        assignedTrainer: null
+      }
+    ];
+    updateDashboardQueue();
+    console.log('✅ Test ticket created');
+    showToast('✅ Test ticket created!', 'success');
+  });
+  document.body.appendChild(testButton);
+
+  updateDashboardQueue();
+  updateArchiveList();
+  updateTrainerList();
+  setupQuickTicketForm();
+  setupEmailJSConfigForm();
+  setupAgentManagementForm();
+  checkEmailJSConfiguration();
+  
+  // Setup tab switching
+  setupTabSwitching();
+  
+  // Initialize tab display
+  const defaultTab = document.querySelector('.tab-btn[data-tab="queue"]');
+  if (defaultTab) {
+    const tabId = defaultTab.getAttribute('data-tab');
+    document.querySelectorAll('.tab-content').forEach(content => {
+      content.style.display = 'none';
+    });
+    const activeContent = document.getElementById(tabId);
+    if (activeContent) {
+      activeContent.style.display = 'block';
+    }
+  }
+
+  // Add test ticket creation function to window for testing purposes
+  window.createTestTicket = function() {
+    const testTicket = {
+      id: 'TKT-1001',
+      timestamp: new Date().toISOString(),
+      mobileNumber: '1234567890',
+      product: 'Test Product',
+      language: 'English',
+      queryDescription: 'This is a test ticket for email functionality',
+      priority: 'High',
+      category: 'Test',
+      status: 'Open',
+      assignedTrainer: null
+    };
+
+    ticketsArray = [testTicket]; // Replace any existing tickets
+    updateDashboardQueue();
+    console.log('✅ Test ticket created');
+    showToast('✅ Test ticket created!', 'success');
+  };
+
+   // Auto-refresh queue every 2 seconds (disabled for debugging)
+  /*
+  setInterval(() => {
+    loadFromLocalStorage();
+    updateDashboardQueue();
+  }, 2000);
+  */
+
+  // Refresh when page becomes visible
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      console.log('📊 Dashboard is now visible - refreshing');
+      loadFromLocalStorage();
+      updateDashboardQueue();
+      showToast('✅ Dashboard synced', 'success');
+    }
+  });
+});
+
+// ===== Local Storage Functions =====
+function saveToLocalStorage() {
+  localStorage.setItem(DB_KEYS.TICKETS, JSON.stringify(ticketsArray));
+  localStorage.setItem(DB_KEYS.TRAINERS, JSON.stringify(trainersArray));
+}
+
+function loadFromLocalStorage() {
+  const savedTickets = localStorage.getItem(DB_KEYS.TICKETS);
+  const savedTrainers = localStorage.getItem(DB_KEYS.TRAINERS);
+
+  // Load tickets from localStorage
+  if (savedTickets) {
+    ticketsArray = JSON.parse(savedTickets);
+    console.log('✅ Loaded ' + ticketsArray.length + ' tickets from localStorage');
+  } else {
+    ticketsArray = [];
+    console.log('⚠️ No tickets in localStorage');
+  }
+
+  if (savedTrainers) {
+    trainersArray = JSON.parse(savedTrainers);
+  } else {
+    trainersArray = [
+      { id: 1, name: 'Alice Johnson', status: 'Available', load: 0 },
+      { id: 2, name: 'Bob Smith', status: 'Available', load: 0 },
+      { id: 3, name: 'Carol Williams', status: 'Available', load: 0 }
+    ];
+  }
+}
+
+// ===== Create Ticket Row =====
+function createTicketRow(ticket) {
+  const priorityColors = {
+    'High': '#ef4444',
+    'Medium': '#f59e0b',
+    'Low': '#10b981'
+  };
+
+  const priorityColor = priorityColors[ticket.priority] || '#6b7280';
+  const timestamp = new Date(ticket.timestamp);
+  const timeAgo = getTimeAgo(timestamp);
+
+  // Show assignment info if ticket is assigned
+  const assignmentInfo = ticket.assignedTrainer ? `
+    <div style="margin-top: 0.5rem; padding: 0.5rem; background: #d1fae5; border-radius: 4px; font-size: 0.85rem; color: #065f46;">
+      <i class="fas fa-user-check"></i> Assigned to: ${escapeHtml(ticket.assignedTrainer)}
+      ${ticket.assignmentMethod ? `<span style="color: #6b7280;">(${ticket.assignmentMethod})</span>` : ''}
+    </div>
+  ` : `
+    <div style="margin-top: 0.5rem; padding: 0.5rem; background: #fef3c7; border-radius: 4px; font-size: 0.85rem; color: #92400e;">
+      <i class="fas fa-clock"></i> Awaiting assignment
+    </div>
+  `;
+
+  return `
+    <div class="ticket-card" style="border: 1px solid ${priorityColor}; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background-color: #f9fafb;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: bold; color: ${priorityColor}; font-size: 1.2rem;">${ticket.priority} Priority</div>
+          <div style="font-size: 0.9rem; color: #6b7280;">${timeAgo}</div>
+        </div>
+        <button class="claim-btn" onclick="claimTicket('${ticket.id}')" style="background: #4f46e5; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+          Claim/Assign
+        </button>
+      </div>
+      <div style="margin-top: 1rem;">
+        <div style="font-weight: 600; font-size: 1rem;">Mobile: ${escapeHtml(ticket.mobileNumber)}</div>
+        <div style="font-size: 0.9rem; color: #374151;">Product: ${escapeHtml(ticket.product)}</div>
+        ${ticket.language ? `<div style="font-size: 0.9rem; color: #374151;"><i class="fas fa-language"></i> Language: ${escapeHtml(ticket.language)}</div>` : ''}
+        <div style="margin-top: 0.5rem; color: #374151;">Query: ${escapeHtml(ticket.queryDescription)}</div>
+        ${assignmentInfo}
+      </div>
+    </div>
+  `;
+}
+
+// ===== Mobile Number Validation =====
+function validateMobileNumber(mobileNumber) {
+  // Remove any whitespace or special characters
+  const cleaned = mobileNumber.replace(/\s/g, '');
+  
+  // Check if empty
+  if (!cleaned || cleaned.length === 0) {
+    return { valid: false, message: 'Mobile number is required' };
+  }
+  
+  // Check if contains only digits
+  if (!/^\d+$/.test(cleaned)) {
+    return { valid: false, message: 'Mobile number must contain only digits (0-9)' };
+  }
+  
+  // Check if exactly 10 digits
+  if (cleaned.length !== 10) {
+    return { valid: false, message: 'Mobile number must be exactly 10 digits' };
+  }
+  
+  // Check if first digit is not 0 (no leading zeros)
+  if (cleaned.charAt(0) === '0') {
+    return { valid: false, message: 'Mobile number cannot start with 0' };
+  }
+  
+  // Check if first digit is valid (1-9 for Indian mobile numbers)
+  const firstDigit = parseInt(cleaned.charAt(0), 10);
+  if (firstDigit < 1 || firstDigit > 9) {
+    return { valid: false, message: 'Mobile number must start with a digit between 1-9' };
+  }
+  
+  // All checks passed
+  return { valid: true, message: 'Valid', cleanedNumber: cleaned };
+}
+
+// ===== Setup Quick Ticket Form =====
+function setupQuickTicketForm() {
+  const form = document.getElementById('quickTicketForm');
+  if (!form) return;
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const mobileNumber = document.getElementById('mobile').value.trim();
+    const product = document.getElementById('product').value;
+    const language = document.getElementById('language').value.trim();
+    const queryDescription = document.getElementById('queries').value.trim();
+    const priority = document.querySelector('input[name="priority"]:checked').value;
+
+    // Validate mobile number
+    const mobileValidation = validateMobileNumber(mobileNumber);
+    if (!mobileValidation.valid) {
+      showToast('❌ ' + mobileValidation.message, 'error');
+      return;
+    }
+
+    if (!product || !language || !queryDescription || !priority) {
+      showToast('❌ Please fill in all fields', 'error');
+      return;
+    }
+
+    const newTicket = {
+      id: generateTicketId(),
+      timestamp: new Date().toISOString(),
+      mobileNumber: mobileValidation.cleanedNumber,
+      product: product,
+      language: language,
+      queryDescription: queryDescription,
+      priority: priority,
+      category: product,
+      status: 'Open',
+      assignedTrainer: null
+    };
+
+    // Auto-assign ticket using round-robin
+    const assignedAgent = autoAssignTicket(newTicket);
+    
+    if (assignedAgent) {
+      showToast('✅ Ticket submitted and auto-assigned to ' + assignedAgent.email, 'success');
+    } else {
+      showToast('⚠️ Ticket submitted but no agents available for assignment', 'error');
+    }
+
+    ticketsArray.push(newTicket);
+    form.reset();
+    updateDashboardQueue();
+    saveToLocalStorage();
+  });
+}
+
+// ===== Setup Agent Management Form =====
+function setupAgentManagementForm() {
+  const form = document.getElementById('addAgentForm');
+  if (!form) return;
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById('agentName').value.trim();
+    const email = document.getElementById('agentEmail').value.trim();
+
+    if (addNewAgent(name, email)) {
+      form.reset();
+    }
+  });
+}
+
+// ===== Update Dashboard Queue =====
+function updateDashboardQueue() {
+  const queueContainer = document.getElementById('ticketQueue');
+  const emptyState = document.getElementById('emptyQueue');
+
+  if (!queueContainer || !emptyState) return;
+
+  // Reload tickets from localStorage to get latest data
+  const savedTickets = localStorage.getItem(DB_KEYS.TICKETS);
+  if (savedTickets) {
+    ticketsArray = JSON.parse(savedTickets);
+  }
+
+  // Only show Open tickets in queue
+  const openTickets = ticketsArray.filter(ticket => ticket.status === 'Open');
+
+  const priorityOrder = { 'High': 0, 'Medium': 1, 'Low': 2 };
+  openTickets.sort((a, b) => {
+    if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    }
+    return new Date(b.timestamp) - new Date(a.timestamp);
+  });
+
+  queueContainer.innerHTML = '';
+
+  if (openTickets.length === 0) {
+    emptyState.style.display = 'block';
+    updateQueueBadge();
+    return;
+  }
+
+  emptyState.style.display = 'none';
+
+  const rows = Math.ceil(openTickets.length / 4);
+  for (let i = 0; i < rows; i++) {
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.justifyContent = 'space-between';
+    row.style.marginBottom = '1rem';
+
+    const start = i * 4;
+    const end = start + 4;
+    const ticketsInRow = openTickets.slice(start, end);
+
+    ticketsInRow.forEach(ticket => {
+      const ticketHTML = createTicketRow(ticket);
+      const ticketElement = document.createElement('div');
+      ticketElement.innerHTML = ticketHTML;
+      ticketElement.style.flex = '1';
+      ticketElement.style.margin = '0 0.5rem';
+      row.appendChild(ticketElement);
+    });
+
+    queueContainer.appendChild(row);
+  }
+
+  updateQueueBadge();
+  updateLanguageFilter();
+}
+
+// ===== Filter Tickets =====
+function filterTickets() {
+  const queueContainer = document.getElementById('ticketQueue');
+  const emptyState = document.getElementById('emptyQueue');
+  
+  if (!queueContainer || !emptyState) return;
+
+  // Reload tickets from localStorage
+  const savedTickets = localStorage.getItem(DB_KEYS.TICKETS);
+  if (savedTickets) {
+    ticketsArray = JSON.parse(savedTickets);
+  }
+
+  // Get filter values
+  const urgencyFilter = document.getElementById('urgencyFilter')?.value || 'all';
+  const categoryFilter = document.getElementById('categoryFilter')?.value || 'all';
+  const languageFilter = document.getElementById('languageFilter')?.value || 'all';
+
+  // Filter open tickets and apply all filters
+  let filteredTickets = ticketsArray.filter(ticket => ticket.status === 'Open');
+
+  if (urgencyFilter !== 'all') {
+    filteredTickets = filteredTickets.filter(ticket => ticket.priority === urgencyFilter);
+  }
+
+  if (categoryFilter !== 'all') {
+    filteredTickets = filteredTickets.filter(ticket => ticket.category === categoryFilter);
+  }
+
+  if (languageFilter !== 'all') {
+    filteredTickets = filteredTickets.filter(ticket => ticket.language === languageFilter);
+  }
+
+  // Sort by priority
+  const priorityOrder = { 'High': 0, 'Medium': 1, 'Low': 2 };
+  filteredTickets.sort((a, b) => {
+    if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    }
+    return new Date(b.timestamp) - new Date(a.timestamp);
+  });
+
+  // Update language filter dropdown with unique languages from tickets
+  updateLanguageFilter();
+
+  // Render filtered tickets
+  queueContainer.innerHTML = '';
+
+  if (filteredTickets.length === 0) {
+    emptyState.style.display = 'block';
+    updateQueueBadge();
+    return;
+  }
+
+  emptyState.style.display = 'none';
+
+  const rows = Math.ceil(filteredTickets.length / 4);
+  for (let i = 0; i < rows; i++) {
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.justifyContent = 'space-between';
+    row.style.marginBottom = '1rem';
+
+    const start = i * 4;
+    const end = start + 4;
+    const ticketsInRow = filteredTickets.slice(start, end);
+
+    ticketsInRow.forEach(ticket => {
+      const ticketHTML = createTicketRow(ticket);
+      const ticketElement = document.createElement('div');
+      ticketElement.innerHTML = ticketHTML;
+      ticketElement.style.flex = '1';
+      ticketElement.style.margin = '0 0.5rem';
+      row.appendChild(ticketElement);
+    });
+
+    queueContainer.appendChild(row);
+  }
+
+  updateQueueBadge();
+}
+
+// ===== Update Language Filter Dropdown =====
+function updateLanguageFilter() {
+  const languageSelect = document.getElementById('languageFilter');
+  if (!languageSelect) return;
+
+  // Get unique languages from tickets
+  const savedTickets = localStorage.getItem(DB_KEYS.TICKETS);
+  if (savedTickets) {
+    const tickets = JSON.parse(savedTickets);
+    const languages = [...new Set(tickets.map(t => t.language).filter(l => l))];
+    
+    // Save current selection
+    const currentSelection = languageSelect.value;
+    
+    // Rebuild options
+    languageSelect.innerHTML = '<option value="all">All Languages</option>';
+    languages.forEach(lang => {
+      const option = document.createElement('option');
+      option.value = lang;
+      option.textContent = lang;
+      languageSelect.appendChild(option);
+    });
+    
+    // Restore selection if still available
+    if (languages.includes(currentSelection)) {
+      languageSelect.value = currentSelection;
+    }
+  }
+}
+
+// ===== Update Archive List =====
+function updateArchiveList() {
+  const archiveContainer = document.getElementById('archiveList');
+  const emptyArchive = document.getElementById('emptyArchive');
+
+  if (!archiveContainer || !emptyArchive) return;
+
+  // Get resolved tickets
+  const resolvedTickets = ticketsArray.filter(ticket => ticket.status === 'Resolved');
+
+  archiveContainer.innerHTML = '';
+
+  if (resolvedTickets.length === 0) {
+    emptyArchive.style.display = 'block';
+    return;
+  }
+
+  emptyArchive.style.display = 'none';
+
+  resolvedTickets.forEach(ticket => {
+    const archiveItem = document.createElement('div');
+    archiveItem.style.cssText = 'background: white; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; border-left: 4px solid #10b981; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
+    archiveItem.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: bold; color: #10b981;">${escapeHtml(ticket.priority)} Priority - Resolved</div>
+          <div style="font-size: 0.85rem; color: #6b7280;">Assigned to: ${escapeHtml(ticket.assignedTrainer)}</div>
+        </div>
+        <div style="font-size: 0.85rem; color: #6b7280;">
+          ${ticket.resolvedAt ? new Date(ticket.resolvedAt).toLocaleDateString() : ''}
+        </div>
+      </div>
+      <div style="margin-top: 0.5rem; font-size: 0.9rem;">
+        <div><strong>Ticket ID:</strong> ${escapeHtml(ticket.id)}</div>
+        <div><strong>Mobile:</strong> ${escapeHtml(ticket.mobileNumber)}</div>
+        <div><strong>Product:</strong> ${escapeHtml(ticket.product)}</div>
+        ${ticket.language ? `<div><strong>Language:</strong> ${escapeHtml(ticket.language)}</div>` : ''}
+        <div><strong>Query:</strong> ${escapeHtml(ticket.queryDescription)}</div>
+      </div>
+    `;
+    archiveContainer.appendChild(archiveItem);
+  });
+}
+
+// ===== Manual Refresh Function =====
+function manualRefreshQueue() {
+  loadFromLocalStorage();
+  updateDashboardQueue();
+  showToast('✅ Dashboard refreshed!', 'success');
+}
+
+// ===== Claim/Assign Ticket =====
+function claimTicket(ticketId) {
+  const ticketIndex = ticketsArray.findIndex(ticket => ticket.id === ticketId);
+  if (ticketIndex === -1) {
+    showToast('❌ Ticket not found', 'error');
+    return;
+  }
+
+  const ticket = ticketsArray[ticketIndex];
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 3000;';
+
+  const modalContent = document.createElement('div');
+  modalContent.style.cssText = 'background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 400px; width: 90%;';
+
+  modalContent.innerHTML = '<h3 style="margin-bottom: 1.5rem; color: #374151;">Assign Ticket to Email</h3>' +
+    '<form id="assignEmailForm">' +
+    '<div style="margin-bottom: 1rem;">' +
+    '<label for="emailInput" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Email Address:</label>' +
+    '<input type="email" id="emailInput" placeholder="Enter email address" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem;">' +
+    '</div>' +
+    '<button type="submit" style="width: 100%; padding: 0.75rem; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Assign Ticket</button>' +
+    '</form>';
+
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+
+  const form = modalContent.querySelector('#assignEmailForm');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = document.getElementById('emailInput').value.trim();
+
+    if (!email) {
+      showToast('❌ Please enter a valid email', 'error');
+      return;
+    }
+
+    // Change status to Resolved
+    ticket.status = 'Resolved';
+    ticket.assignedTrainer = email;
+    ticket.resolvedAt = new Date().toISOString();
+
+    saveToLocalStorage();
+    updateDashboardQueue();
+    updateArchiveList();
+    sendEmail(email, ticket);
+
+    modal.remove();
+    showToast('✅ Ticket assigned and archived', 'success');
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.remove();
+    }
+  });
+}
+
+// ===== Send Email =====
+function sendEmail(email, ticket) {
+  const emailContent = generateEmailContent(email, ticket);
+  showEmailPreviewModal(emailContent, email, ticket);
+  console.log('📧 EMAIL TO SEND:', emailContent);
+
+  const config = getEmailJSConfig();
+  console.log('🔧 EmailJS Config:', config);
+
+  if (!config.publicKey || !config.serviceId || !config.templateId) {
+    console.log('⚠️ EmailJS not configured');
+    showToast('❌ EmailJS not configured. Please set up credentials in Settings.', 'error');
+    return;
+  }
+
+  if (typeof emailjs === 'undefined') {
+    console.log('⚠️ EmailJS library not loaded');
+    showToast('❌ EmailJS library failed to load. Please refresh the page.', 'error');
+    return;
+  }
+
+  try {
+    console.log('🔧 Initializing EmailJS with public key:', config.publicKey.substring(0, 10) + '...');
+    emailjs.init(config.publicKey);
+
+    const templateParams = {
+      to_email: email,
+      ticket_id: ticket.id,
+      mobile_number: ticket.mobileNumber,
+      product: ticket.product,
+      query_description: ticket.queryDescription,
+      priority: ticket.priority,
+      status: ticket.status,
+      assigned_date: new Date().toLocaleString()
+    };
+
+    console.log('📧 Sending email with parameters:', templateParams);
+
+    emailjs.send(config.serviceId, config.templateId, templateParams)
+      .then((response) => {
+        console.log('✅ Email sent successfully:', response);
+        showToast('✅ Email sent to ' + email, 'success');
+      })
+      .catch((error) => {
+        console.error('❌ Email sending failed:', error);
+        console.error('❌ Error details:', {
+          error_text: error.text,
+          error_message: error.message,
+          error_status: error.status,
+          error_type: typeof error
+        });
+
+        // Show detailed error message
+        let errorMessage = 'Unknown error';
+        if (error.text) errorMessage = error.text;
+        else if (error.message) errorMessage = error.message;
+        else if (error.status) errorMessage = 'HTTP Error: ' + error.status;
+
+        showToast('❌ Failed to send email. Error: ' + errorMessage, 'error');
+      });
+  } catch (error) {
+    console.error('❌ EmailJS initialization error:', error);
+    showToast('❌ EmailJS configuration error. Please check your credentials.', 'error');
+  }
+}
+
+function generateEmailContent(email, ticket) {
+  return '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+    'TICKET ASSIGNED\n' +
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+    'Dear Support Team,\n\n' +
+    'You have been assigned a new ticket.\n\n' +
+    'Ticket ID:       ' + ticket.id + '\n' +
+    'Mobile:          ' + ticket.mobileNumber + '\n' +
+    'Product:         ' + ticket.product + '\n' +
+    'Priority:        ' + ticket.priority + '\n' +
+    'Status:          Assigned\n' +
+    'Date:            ' + new Date().toLocaleString() + '\n\n' +
+    'Query:\n' + ticket.queryDescription + '\n\n' +
+    'Please address this ticket promptly.\n\n' +
+    'Best regards,\n' +
+    'Self-Ticket Support System\n';
+}
+
+function showEmailPreviewModal(emailContent, email, ticket) {
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 3000;';
+
+  const modalContent = document.createElement('div');
+  modalContent.style.cssText = 'background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;';
+
+  modalContent.innerHTML = '<h3 style="margin-bottom: 1rem; color: #1f2937;">Email Preview</h3>' +
+    '<p style="color: #6b7280; margin-bottom: 1.5rem;">Email to: <strong>' + escapeHtml(email) + '</strong></p>' +
+    '<pre style="background: #f3f4f6; padding: 1.5rem; border-radius: 6px; overflow-x: auto; font-family: monospace; font-size: 0.85rem; line-height: 1.6; color: #374151;">' + escapeHtml(emailContent) + '</pre>' +
+    '<div style="margin-top: 1.5rem; display: flex; gap: 1rem;">' +
+    '<button id="sendEmailBtn" style="flex: 1; padding: 0.75rem; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Send</button>' +
+    '<button onclick="this.closest(\'div\').parentElement.remove()" style="flex: 1; padding: 0.75rem; background: #f3f4f6; color: #374151; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Close</button>' +
+    '</div>';
+
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+
+  // Add click event listener to Send button
+  const sendBtn = modalContent.querySelector('#sendEmailBtn');
+  sendBtn.addEventListener('click', () => {
+    if (ticket) {
+      // Call the actual send email function
+      const config = getEmailJSConfig();
+      
+      if (!config.publicKey || !config.serviceId || !config.templateId) {
+        showToast('❌ EmailJS not configured. Please set up credentials in Settings.', 'error');
+        return;
+      }
+
+       // Check if EmailJS library is available
+       if (typeof emailjs === 'undefined') {
+         console.error('EmailJS library not defined');
+         
+         // Try to reload the EmailJS library dynamically
+         const script = document.createElement('script');
+         script.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js'; // Correct URL
+         script.async = true;
+         script.onload = () => {
+           console.log('EmailJS library loaded successfully');
+           // Wait a little more to ensure initialization
+           setTimeout(() => {
+             if (typeof emailjs !== 'undefined') {
+               sendEmailInternal(email, ticket, config, modal);
+             } else {
+               showToast('❌ EmailJS library failed to initialize. Please refresh the page.', 'error');
+             }
+           }, 500);
+         };
+         script.onerror = () => {
+           console.error('Failed to load EmailJS library');
+           showToast('❌ Failed to load EmailJS library. Please check your internet connection and refresh the page.', 'error');
+         };
+         document.head.appendChild(script);
+         
+         return;
+       }
+      
+      sendEmailInternal(email, ticket, config, modal);
+    } else {
+      showToast('❌ Ticket not found', 'error');
+    }
+  });
+  
+  function sendEmailInternal(email, ticket, config, modal) {
+    try {
+      emailjs.init(config.publicKey);
+
+      const templateParams = {
+        to_email: email,
+        ticket_id: ticket.id,
+        mobile_number: ticket.mobileNumber,
+        product: ticket.product,
+        query_description: ticket.queryDescription,
+        priority: ticket.priority,
+        status: ticket.status,
+        assigned_date: new Date().toLocaleString()
+      };
+
+      emailjs.send(config.serviceId, config.templateId, templateParams)
+        .then((response) => {
+          console.log('✅ Email sent successfully:', response);
+          showToast('✅ Email sent to ' + email, 'success');
+          modal.remove(); // Close modal after successful send
+        })
+        .catch((error) => {
+          console.error('❌ Email sending failed:', error);
+          
+          let errorMessage = 'Unknown error';
+          if (error.text) errorMessage = error.text;
+          else if (error.message) errorMessage = error.message;
+          else if (error.status) errorMessage = 'HTTP Error: ' + error.status;
+
+          showToast('❌ Failed to send email. Error: ' + errorMessage, 'error');
+        });
+    } catch (error) {
+      console.error('❌ EmailJS initialization error:', error);
+      showToast('❌ EmailJS configuration error. Please check your credentials.', 'error');
+    }
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.remove();
+    }
+  });
+}
+
+// ===== EmailJS Configuration =====
+function setupEmailJSConfigForm() {
+  const form = document.getElementById('emailjsConfigForm');
+  if (!form) return;
+
+  const config = getEmailJSConfig();
+  document.getElementById('publicKey').value = config.publicKey || '';
+  document.getElementById('serviceId').value = config.serviceId || '';
+  document.getElementById('templateId').value = config.templateId || '';
+
+  if (config.publicKey && config.serviceId && config.templateId) {
+    form.style.display = 'none';
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const newConfig = {
+      publicKey: document.getElementById('publicKey').value.trim(),
+      serviceId: document.getElementById('serviceId').value.trim(),
+      templateId: document.getElementById('templateId').value.trim()
+    };
+
+    if (!newConfig.publicKey || !newConfig.serviceId || !newConfig.templateId) {
+      showToast('❌ Fill in all fields', 'error');
+      return;
+    }
+
+    // Save configuration permanently
+    localStorage.setItem('emailjsConfig', JSON.stringify(newConfig));
+
+    // Also save to a more persistent location for backup
+    localStorage.setItem('emailjsConfigBackup', JSON.stringify(newConfig));
+
+    const statusDiv = document.getElementById('configStatus');
+    if (statusDiv) {
+      statusDiv.style.display = 'block';
+      statusDiv.style.background = '#d1fae5';
+      statusDiv.style.borderLeft = '4px solid #10b981';
+      statusDiv.style.color = '#065f46';
+      statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> ✅ EmailJS configured permanently!';
+    }
+
+    form.style.display = 'none';
+    showToast('✅ EmailJS configured permanently!', 'success');
+
+    setTimeout(() => {
+      if (statusDiv) statusDiv.style.display = 'none';
+    }, 3000);
+  });
+}
+
+function getEmailJSConfig() {
+  const saved = localStorage.getItem('emailjsConfig');
+  const backup = localStorage.getItem('emailjsConfigBackup');
+
+  if (saved) {
+    return JSON.parse(saved);
+  } else if (backup) {
+    // Restore from backup if main config is missing
+    localStorage.setItem('emailjsConfig', backup);
+    return JSON.parse(backup);
+  }
+
+  return { publicKey: '', serviceId: '', templateId: '' };
+}
+
+function checkEmailJSConfiguration() {
+  const config = getEmailJSConfig();
+  const statusDiv = document.getElementById('configStatus');
+
+  if (statusDiv && config.publicKey && config.serviceId && config.templateId) {
+    statusDiv.style.display = 'block';
+    statusDiv.style.background = '#d1fae5';
+    statusDiv.style.borderLeft = '4px solid #10b981';
+    statusDiv.style.color = '#065f46';
+    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> ✅ EmailJS is configured!';
+  }
+}
+
+// ===== Helper Functions =====
+function setupTabSwitching() {
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabId = button.getAttribute('data-tab');
+      
+      // Remove active class from all buttons
+      tabButtons.forEach(btn => btn.classList.remove('active'));
+      
+      // Add active class to clicked button
+      button.classList.add('active');
+      
+      // Hide all tab contents
+      tabContents.forEach(content => {
+        content.style.display = 'none';
+      });
+      
+      // Show selected tab content
+      const selectedContent = document.getElementById(tabId);
+      if (selectedContent) {
+        selectedContent.style.display = 'block';
+      }
+      
+      // Update archive list when switching to archive tab
+      if (tabId === 'archive') {
+        updateArchiveList();
+      }
+      
+      // Update agent list when switching to agents tab
+      if (tabId === 'agents') {
+        updateAvailableAgentsList();
+        updateAssignmentHistory();
+      }
+      
+      // Update reports when switching to reports tab
+      if (tabId === 'reports') {
+        updateAssignmentStats();
+      }
+    });
+  });
+}
+
+function generateTicketId() {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 7);
+  return 'TKT-' + (timestamp + random).toUpperCase();
+}
+
+function getTimeAgo(date) {
+  const seconds = Math.floor((Date.now() - date) / 1000);
+
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+  if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+  if (seconds < 2592000) return Math.floor(seconds / 86400) + 'd ago';
+
+  return date.toLocaleDateString();
+}
+
+function updateQueueBadge() {
+  const badge = document.getElementById('queueBadge');
+  if (!badge) return;
+
+  const openCount = ticketsArray.filter(ticket => ticket.status === 'Open').length;
+  badge.textContent = openCount;
+}
+
+function updateTrainerList() {
+  const trainerList = document.getElementById('trainerList');
+  if (!trainerList) return;
+
+  trainerList.innerHTML = trainersArray.map(trainer => `
+    <div style="display: flex; justify-content: space-between; padding: 0.75rem; background: #f8fafc; margin: 0.5rem 0; border-radius: 6px;">
+      <div>
+        <div style="font-weight: 600;">${escapeHtml(trainer.name)}</div>
+        <div style="font-size: 0.85rem; color: #6b7280;">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${trainer.status === 'Available' ? '#10b981' : '#f59e0b'}; margin-right: 0.5rem;"></span>
+          ${trainer.status} • Load: ${trainer.load}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showToast(message, type = 'success') {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.style.cssText = `
+    position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+    background: ${type === 'error' ? '#ef4444' : '#10b981'}; color: white;
+    padding: 1rem 1.5rem; border-radius: 6px; display: flex; align-items: center; gap: 0.75rem; z-index: 1000;
+  `;
+
+  toast.innerHTML = `<i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'}"></i><span>${message}</span>`;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ===== Round-Robin Agent Management UI =====
+
+// Update the available agents list in the UI
+function updateAvailableAgentsList() {
+  const container = document.getElementById('availableAgentsList');
+  if (!container) return;
+
+  const activeAgents = availableAgents.filter(a => a.status === 'Active');
+  const inactiveAgents = availableAgents.filter(a => a.status === 'Inactive');
+
+  container.innerHTML = `
+    <div style="margin-bottom: 1.5rem;">
+      <h4 style="color: #374151; margin-bottom: 1rem;"><i class="fas fa-users"></i> Active Agents (${activeAgents.length})</h4>
+      ${activeAgents.length === 0 ? '<p style="color: #6b7280;">No active agents</p>' : ''}
+      ${activeAgents.map(agent => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f0fdf4; margin: 0.5rem 0; border-radius: 6px; border-left: 3px solid #10b981;">
+          <div>
+            <div style="font-weight: 600;">${escapeHtml(agent.name)}</div>
+            <div style="font-size: 0.85rem; color: #6b7280;">${escapeHtml(agent.email)}</div>
+            <div style="font-size: 0.8rem; color: #9ca3af;">Assigned: ${agent.assignedCount || 0} tickets</div>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button onclick="toggleAgentStatus(${agent.id})" style="padding: 0.4rem 0.8rem; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+              <i class="fas fa-pause"></i>
+            </button>
+            <button onclick="removeAgentFromList(${agent.id})" style="padding: 0.4rem 0.8rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    ${inactiveAgents.length > 0 ? `
+    <div style="margin-bottom: 1.5rem;">
+      <h4 style="color: #6b7280; margin-bottom: 1rem;"><i class="fas fa-user-slash"></i> Inactive Agents (${inactiveAgents.length})</h4>
+      ${inactiveAgents.map(agent => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f3f4f6; margin: 0.5rem 0; border-radius: 6px; border-left: 3px solid #9ca3af; opacity: 0.7;">
+          <div>
+            <div style="font-weight: 600; color: #6b7280;">${escapeHtml(agent.name)}</div>
+            <div style="font-size: 0.85rem; color: #9ca3af;">${escapeHtml(agent.email)}</div>
+          </div>
+          <button onclick="toggleAgentStatus(${agent.id})" style="padding: 0.4rem 0.8rem; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+            <i class="fas fa-play"></i> Reactivate
+          </button>
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
+  `;
+
+  // Update rotation info
+  const rotationInfo = document.getElementById('rotationInfo');
+  if (rotationInfo) {
+    const nextAgent = activeAgents.length > 0 ? activeAgents[rotationIndex % activeAgents.length] : null;
+    rotationInfo.innerHTML = `
+      <div style="padding: 1rem; background: #eff6ff; border-radius: 6px; border-left: 3px solid #4f46e5;">
+        <div style="font-weight: 600; color: #4f46e5; margin-bottom: 0.5rem;">
+          <i class="fas fa-sync"></i> Round-Robin Status
+        </div>
+        <div style="font-size: 0.9rem; color: #374151;">
+          <strong>Next Agent:</strong> ${nextAgent ? escapeHtml(nextAgent.name) + ' (' + escapeHtml(nextAgent.email) + ')' : 'None available'}
+        </div>
+        <div style="font-size: 0.85rem; color: #6b7280; margin-top: 0.5rem;">
+          <strong>Rotation Index:</strong> ${rotationIndex} | <strong>Total Active:</strong> ${activeAgents.length}
+        </div>
+      </div>
+    `;
+  }
+}
+
+// Toggle agent status between Active and Inactive
+function toggleAgentStatus(agentId) {
+  const agent = availableAgents.find(a => a.id === agentId);
+  if (agent) {
+    const newStatus = agent.status === 'Active' ? 'Inactive' : 'Active';
+    setAgentStatus(agentId, newStatus);
+    updateAvailableAgentsList();
+    showToast('✅ Agent ' + (newStatus === 'Active' ? 'activated' : 'deactivated'), 'success');
+  }
+}
+
+// Remove agent from the list
+function removeAgentFromList(agentId) {
+  if (confirm('Are you sure you want to remove this agent from the rotation?')) {
+    removeAgent(agentId);
+    updateAvailableAgentsList();
+    showToast('✅ Agent removed from rotation', 'success');
+  }
+}
+
+// Add new agent via form
+function addNewAgent(name, email) {
+  if (!name || !email) {
+    showToast('❌ Please provide both name and email', 'error');
+    return false;
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    showToast('❌ Please enter a valid email address', 'error');
+    return false;
+  }
+
+  // Check if email already exists
+  if (availableAgents.some(a => a.email.toLowerCase() === email.toLowerCase())) {
+    showToast('❌ This email is already in the agent list', 'error');
+    return false;
+  }
+
+  addAgent(name, email);
+  updateAvailableAgentsList();
+  showToast('✅ Agent added: ' + email, 'success');
+  return true;
+}
+
+// Reset the rotation
+function resetRoundRobinRotation() {
+  resetRotation();
+  updateAvailableAgentsList();
+  showToast('✅ Rotation reset to beginning', 'success');
+}
+
+// ===== Assignment History UI =====
+
+// Update assignment history display
+function updateAssignmentHistory() {
+  const container = document.getElementById('assignmentHistoryList');
+  if (!container) return;
+
+  const history = getAssignmentHistory();
+
+  if (history.length === 0) {
+    container.innerHTML = '<p style="color: #6b7280; text-align: center; padding: 2rem;">No assignment history yet</p>';
+    return;
+  }
+
+  container.innerHTML = history.map(record => `
+    <div style="padding: 1rem; background: white; margin: 0.5rem 0; border-radius: 6px; border-left: 3px solid #4f46e5; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+      <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div>
+          <div style="font-weight: 600; color: #4f46e5;">${escapeHtml(record.ticketId)}</div>
+          <div style="font-size: 0.85rem; color: #6b7280;">
+            <i class="fas fa-user"></i> ${escapeHtml(record.agentName)} (${escapeHtml(record.agentEmail)})
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 0.8rem; color: #9ca3af;">${new Date(record.assignedAt).toLocaleString()}</div>
+          <div style="font-size: 0.75rem; color: #10b981; background: #d1fae5; padding: 0.2rem 0.5rem; border-radius: 3px; display: inline-block; margin-top: 0.25rem;">
+            ${record.method}
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #374151;">
+        <strong>Priority:</strong> ${record.ticketDetails.priority} | 
+        <strong>Product:</strong> ${escapeHtml(record.ticketDetails.product)}
+      </div>
+    </div>
+  `).join('');
+}
+
+// Get assignment statistics for reports
+function getAssignmentStats() {
+  const history = getAssignmentHistory();
+  const stats = {};
+
+  history.forEach(record => {
+    if (!stats[record.agentEmail]) {
+      stats[record.agentEmail] = {
+        email: record.agentEmail,
+        name: record.agentName,
+        count: 0,
+        highPriority: 0,
+        mediumPriority: 0,
+        lowPriority: 0
+      };
+    }
+    stats[record.agentEmail].count++;
+    if (record.ticketDetails.priority === 'High') stats[record.agentEmail].highPriority++;
+    if (record.ticketDetails.priority === 'Medium') stats[record.agentEmail].mediumPriority++;
+    if (record.ticketDetails.priority === 'Low') stats[record.agentEmail].lowPriority++;
+  });
+
+  return Object.values(stats);
+}
+
+// Update assignment statistics display
+function updateAssignmentStats() {
+  const container = document.getElementById('assignmentStats');
+  if (!container) return;
+
+  const stats = getAssignmentStats();
+
+  if (stats.length === 0) {
+    container.innerHTML = '<p style="color: #6b7280; text-align: center;">No statistics available</p>';
+    return;
+  }
+
+  // Sort by total assigned
+  stats.sort((a, b) => b.count - a.count);
+
+  container.innerHTML = `
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+      <thead>
+        <tr style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
+          <th style="text-align: left; padding: 0.75rem; color: #374151;">Agent</th>
+          <th style="text-align: center; padding: 0.75rem; color: #374151;">Total</th>
+          <th style="text-align: center; padding: 0.75rem; color: #ef4444;">High</th>
+          <th style="text-align: center; padding: 0.75rem; color: #f59e0b;">Medium</th>
+          <th style="text-align: center; padding: 0.75rem; color: #10b981;">Low</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${stats.map(s => `
+          <tr style="border-bottom: 1px solid #f3f4f6;">
+            <td style="padding: 0.75rem;">
+              <div style="font-weight: 600;">${escapeHtml(s.name)}</div>
+              <div style="font-size: 0.8rem; color: #6b7280;">${escapeHtml(s.email)}</div>
+            </td>
+            <td style="text-align: center; padding: 0.75rem; font-weight: 600;">${s.count}</td>
+            <td style="text-align: center; padding: 0.75rem; color: #ef4444;">${s.highPriority}</td>
+            <td style="text-align: center; padding: 0.75rem; color: #f59e0b;">${s.mediumPriority}</td>
+            <td style="text-align: center; padding: 0.75rem; color: #10b981;">${s.lowPriority}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ===== Expose functions globally =====
+globalThis.claimTicket = claimTicket;
+globalThis.updateDashboardQueue = updateDashboardQueue;
+globalThis.manualRefreshQueue = manualRefreshQueue;
+globalThis.filterTickets = filterTickets;
+globalThis.updateLanguageFilter = updateLanguageFilter;
+
+// Round-robin functions
+globalThis.initializeRoundRobinSystem = initializeRoundRobinSystem;
+globalThis.updateAvailableAgentsList = updateAvailableAgentsList;
+globalThis.toggleAgentStatus = toggleAgentStatus;
+globalThis.removeAgentFromList = removeAgentFromList;
+globalThis.addNewAgent = addNewAgent;
+globalThis.resetRoundRobinRotation = resetRoundRobinRotation;
+globalThis.updateAssignmentHistory = updateAssignmentHistory;
+globalThis.getAssignmentStats = getAssignmentStats;
+globalThis.updateAssignmentStats = updateAssignmentStats;
+globalThis.autoAssignTicket = autoAssignTicket;
+globalThis.getNextAgent = getNextAgent;
+globalThis.getAgentStats = getAgentStats;
+globalThis.getAssignmentHistory = getAssignmentHistory;
+
+// Export assignment history to CSV
+function exportAssignmentHistory() {
+  const history = getAssignmentHistory();
+  
+  if (history.length === 0) {
+    showToast('❌ No assignment history to export', 'error');
+    return;
+  }
+
+  // Create CSV header
+  let csv = 'Ticket ID,Agent Name,Agent Email,Priority,Product,Mobile,Assigned At,Method\n';
+
+  // Add data rows
+  history.forEach(record => {
+    csv += `"${record.ticketId}","${record.agentName}","${record.agentEmail}","${record.ticketDetails.priority}","${record.ticketDetails.product}","${record.ticketDetails.mobileNumber}","${record.assignedAt}","${record.method}"\n`;
+  });
+
+  // Create and download file
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', `assignment_history_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  showToast('✅ Assignment history exported successfully', 'success');
+}
+
+globalThis.exportAssignmentHistory = exportAssignmentHistory;

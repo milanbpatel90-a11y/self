@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self-Ticket Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+</head>
+
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo">
+        <i class="fas fa-ticket-alt"></i>
+        <span>Self-Ticket</span>
+      </div>
+      <nav class="nav-tabs">
+        <button class="tab-btn active" data-tab="queue">
+          <i class="fas fa-list-alt"></i> Queue
+          <span class="badge" id="queueBadge">0</span>
+        </button>
+        <button class="tab-btn" data-tab="archive">
+          <i class="fas fa-archive"></i> Archive
+        </button>
+        <button class="tab-btn" data-tab="agents">
+          <i class="fas fa-users-cog"></i> Agents
+        </button>
+        <button class="tab-btn" data-tab="reports">
+          <i class="fas fa-chart-bar"></i> Reports
+        </button>
+        <button class="tab-btn" data-tab="settings">
+          <i class="fas fa-cog"></i> Settings
+        </button>
+      </nav>
+    </header>
+
+    <main class="main-content">
+      <!-- Queue / Dashboard View -->
+      <section id="queue" class="tab-content">
+        <div class="queue-header">
+            <h2><i class="fas fa-tasks"></i> Ticket Queue</h2>
+            <div style="display: flex; gap: 0.5rem;">
+                <button onclick="manualRefreshQueue()"
+                  style="padding: 0.5rem 1rem; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+                  <i class="fas fa-sync"></i> Refresh
+                </button>
+            </div>
+          <div class="queue-filters">
+            <select id="urgencyFilter" onchange="filterTickets()">
+              <option value="all">All Urgencies</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+            <select id="categoryFilter" onchange="filterTickets()">
+              <option value="all">All Categories</option>
+              <option value="Technical">Technical</option>
+              <option value="Content">Content</option>
+              <option value="Schedule">Schedule</option>
+            </select>
+            <select id="languageFilter" onchange="filterTickets()">
+              <option value="all">All Languages</option>
+            </select>
+          </div>
+        </div>
+        <div id="ticketQueue" class="ticket-grid">
+          <!-- Tickets will be rendered here -->
+        </div>
+        <div id="emptyQueue" class="empty-state">
+          <i class="fas fa-inbox"></i>
+          <p>No open tickets in queue</p>
+        </div>
+      </section>
+
+      <!-- Archive Tab -->
+      <section id="archive" class="tab-content">
+        <h2><i class="fas fa-archive"></i> Resolved Tickets</h2>
+        <div id="archiveList" class="archive-list">
+          <!-- Resolved tickets will be rendered here -->
+        </div>
+        <div id="emptyArchive" class="empty-state">
+          <i class="fas fa-archive"></i>
+          <p>No archived tickets</p>
+        </div>
+      </section>
+
+      <!-- Agents/Round-Robin Management Tab -->
+      <section id="agents" class="tab-content">
+        <h2><i class="fas fa-users-cog"></i> Agent Management</h2>
+        <p style="color: #6b7280; margin-bottom: 1.5rem;">Manage team members for automatic round-robin ticket assignment</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <!-- Left: Agent List -->
+          <div style="background: white; padding: 1.5rem; border-radius: 10px; border: 1px solid #e5e7eb;">
+            <h3 style="margin-bottom: 1rem; color: #374151;"><i class="fas fa-user-friends"></i> Available Agents</h3>
+            
+            <!-- Rotation Status -->
+            <div id="rotationInfo" style="margin-bottom: 1rem;"></div>
+            
+            <!-- Add Agent Form -->
+            <form id="addAgentForm" style="margin-bottom: 1.5rem; padding: 1rem; background: #f9fafb; border-radius: 6px;">
+              <div style="margin-bottom: 0.75rem;">
+                <label for="agentName" style="display: block; margin-bottom: 0.25rem; font-weight: 600; font-size: 0.9rem; color: #374151;">Name</label>
+                <input type="text" id="agentName" placeholder="John Doe" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.9rem;">
+              </div>
+              <div style="margin-bottom: 0.75rem;">
+                <label for="agentEmail" style="display: block; margin-bottom: 0.25rem; font-weight: 600; font-size: 0.9rem; color: #374151;">Email</label>
+                <input type="email" id="agentEmail" placeholder="john@company.com" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.9rem;">
+              </div>
+              <button type="submit" style="width: 100%; padding: 0.5rem; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
+                <i class="fas fa-plus"></i> Add Agent
+              </button>
+            </form>
+            
+            <!-- Agent List -->
+            <div id="availableAgentsList" style="max-height: 400px; overflow-y: auto;"></div>
+          </div>
+          
+          <!-- Right: Assignment History -->
+          <div style="background: white; padding: 1.5rem; border-radius: 10px; border: 1px solid #e5e7eb;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h3 style="color: #374151;"><i class="fas fa-history"></i> Recent Assignments</h3>
+              <button onclick="resetRoundRobinRotation()" style="padding: 0.4rem 0.8rem; background: #4f46e5; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+                <i class="fas fa-sync"></i> Reset Rotation
+              </button>
+            </div>
+            <div id="assignmentHistoryList" style="max-height: 500px; overflow-y: auto;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reports Tab -->
+      <section id="reports" class="tab-content">
+        <h2><i class="fas fa-chart-bar"></i> Assignment Reports</h2>
+        <p style="color: #6b7280; margin-bottom: 1.5rem;">View ticket assignment statistics and distribution</p>
+        
+        <div style="background: white; padding: 1.5rem; border-radius: 10px; border: 1px solid #e5e7eb;">
+          <h3 style="margin-bottom: 1rem; color: #374151;"><i class="fas fa-table"></i> Agent Statistics</h3>
+          <div id="assignmentStats"></div>
+        </div>
+        
+        <div style="margin-top: 1.5rem; background: white; padding: 1.5rem; border-radius: 10px; border: 1px solid #e5e7eb;">
+          <h3 style="margin-bottom: 1rem; color: #374151;"><i class="fas fa-download"></i> Export Data</h3>
+          <p style="color: #6b7280; margin-bottom: 1rem;">Download assignment history for external reporting</p>
+          <button onclick="exportAssignmentHistory()" style="padding: 0.75rem 1.5rem; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+            <i class="fas fa-file-export"></i> Export to CSV
+          </button>
+        </div>
+      </section>
+
+      <!-- Settings Tab -->
+      <section id="settings" class="tab-content">
+        <h2><i class="fas fa-cog"></i> EmailJS Configuration</h2>
+        <div
+          style="max-width: 600px; background: white; padding: 2rem; border-radius: 10px; border: 1px solid #e5e7eb;">
+          <div
+            style="background: #f0f4ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #4f46e5;">
+            <p style="color: #4f46e5; margin: 0; font-weight: 600;">
+              <i class="fas fa-info-circle" style="margin-right: 0.5rem;"></i>
+              AutoEmail Configuration
+            </p>
+            <p style="color: #6b7280; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+              Enter your EmailJS credentials below to enable automatic email sending
+            </p>
+          </div>
+
+          <form id="emailjsConfigForm">
+            <div style="margin-bottom: 1rem;">
+              <label for="publicKey" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
+                EmailJS Public Key
+              </label>
+              <input type="text" id="publicKey" placeholder="pk_xxxxxxxxxxxxxxx"
+                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
+              <p style="margin: 0.5rem 0 0 0; color: #6b7280; font-size: 0.85rem;">
+                Get this from: EmailJS Dashboard → Account → API Keys
+              </p>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <label for="serviceId" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
+                Service ID
+              </label>
+              <input type="text" id="serviceId" placeholder="service_xxxxxxx"
+                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
+              <p style="margin: 0.5rem 0 0 0; color: #6b7280; font-size: 0.85rem;">
+                Get this from: EmailJS Dashboard → Email Services
+              </p>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+              <label for="templateId" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
+                Template ID
+              </label>
+              <input type="text" id="templateId" placeholder="template_xxxxxxx"
+                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
+              <p style="margin: 0.5rem 0 0 0; color: #6b7280; font-size: 0.85rem;">
+                Get this from: EmailJS Dashboard → Email Templates
+              </p>
+            </div>
+
+            <button type="submit"
+              style="width: 100%; padding: 0.75rem; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">
+              <i class="fas fa-save" style="margin-right: 0.5rem;"></i>
+              Save EmailJS Configuration
+            </button>
+          </form>
+
+          <div id="configStatus" style="margin-top: 1rem; padding: 1rem; border-radius: 6px; display: none;"
+            class="config-status">
+          </div>
+
+          <div
+            style="margin-top: 2rem; padding: 1rem; background: #f9fafb; border-radius: 6px; border-left: 4px solid #10b981;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #374151;">
+              <i class="fas fa-check-circle" style="color: #10b981; margin-right: 0.5rem;"></i>
+              How to Get Your Credentials
+            </h4>
+            <ol style="margin: 0; padding-left: 1.5rem; color: #6b7280; font-size: 0.9rem;">
+              <li style="margin-bottom: 0.5rem;">Sign up free at <strong>emailjs.com</strong></li>
+              <li style="margin-bottom: 0.5rem;">Add your email service (Gmail recommended)</li>
+              <li style="margin-bottom: 0.5rem;">Create an email template</li>
+              <li style="margin-bottom: 0.5rem;">Copy your Public Key, Service ID, and Template ID</li>
+              <li>Paste them above and click Save</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- Dashboard Builder Tab -->
+      <section id="dashboard-builder" class="tab-content">
+        <h2><i class="fas fa-chart-line"></i> Query Dashboard Builder</h2>
+        <p style="color: #7f8c8d; margin-bottom: 20px;">Create dashboards from SQL queries for your team</p>
+
+        <div class="dashboard-layout">
+          <div class="query-form-panel">
+            <form id="dashboardForm">
+              <div class="form-group">
+                <label for="dashboardName">
+                  <i class="fas fa-heading"></i> Dashboard Name
+                </label>
+                <input type="text" id="dashboardName" placeholder="Sales Overview" required>
+              </div>
+              <div class="form-group">
+                <label for="dashboardQuery">
+                  <i class="fas fa-database"></i> SQL Query
+                </label>
+                <textarea id="dashboardQuery" rows="5" placeholder="SELECT * FROM sales WHERE date > '2024-01-01'"
+                  required></textarea>
+              </div>
+              <div class="form-group">
+                <label for="chartType">
+                  <i class="fas fa-chart-bar"></i> Chart Type
+                </label>
+                <select id="chartType">
+                  <option value="table">Table</option>
+                  <option value="bar">Bar Chart</option>
+                  <option value="line">Line Chart</option>
+                  <option value="pie">Pie Chart</option>
+                </select>
+              </div>
+              <button type="submit" class="submit-btn">
+                <i class="fas fa-plus"></i> Create Dashboard
+              </button>
+            </form>
+          </div>
+
+          <div class="dashboards-panel">
+            <h3><i class="fas fa-th-large"></i> Available Dashboards</h3>
+            <div id="dashboardsContainer" class="dashboards-grid"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Trainer Management Modal -->
+    <div id="trainerModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fas fa-users-cog"></i> Manage Trainers</h3>
+          <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div id="trainerList" class="trainer-list">
+            <!-- Trainer items will be rendered here -->
+          </div>
+          <form id="trainerForm" class="add-trainer-form">
+            <input type="text" id="trainerName" placeholder="Trainer Name" required>
+            <button type="submit" class="add-btn">
+              <i class="fas fa-plus"></i> Add Trainer
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard View Modal -->
+    <div id="dashboardModal" class="modal">
+      <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-header">
+          <h3 id="modalDashboardTitle"><i class="fas fa-chart-line"></i> Dashboard</h3>
+          <span class="close-modal" onclick="closeDashboardModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div id="dashboardQueryDisplay" class="query-display" style="margin-bottom: 20px;"></div>
+          <div id="dashboardChartContainer" style="height: 350px; margin-bottom: 20px;">
+            <canvas id="chartCanvas"></canvas>
+          </div>
+          <div id="dashboardTableContainer"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">
+      <i class="fas fa-bell"></i>
+      <span id="toastMessage">Notification</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>

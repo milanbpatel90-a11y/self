@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trainer Self-Service Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --white: #ffffff;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .portal-container {
+      background: var(--white);
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      width: 100%;
+      max-width: 480px;
+      overflow: hidden;
+    }
+
+    .portal-header {
+      background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+      color: var(--white);
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .portal-header i {
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .portal-header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .portal-header p {
+      opacity: 0.9;
+      font-size: 0.9rem;
+    }
+
+    .portal-body {
+      padding: 2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .form-group label i {
+      color: var(--primary);
+      width: 16px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      border: 2px solid var(--gray-200);
+      border-radius: 10px;
+      font-size: 1rem;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      background: var(--gray-50);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: var(--white);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .form-group textarea {
+      resize: none;
+      min-height: 100px;
+    }
+
+    .priority-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+    }
+
+    .priority-option {
+      position: relative;
+    }
+
+    .priority-option input {
+      position: absolute;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .priority-option label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      border: 2px solid var(--gray-200);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 0;
+    }
+
+    .priority-option label:hover {
+      border-color: var(--gray-400);
+    }
+
+    .priority-option input:checked + label {
+      border-color: var(--primary);
+      background: rgba(79, 70, 229, 0.05);
+    }
+
+    .priority-option label i {
+      font-size: 1.5rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .priority-option label span {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .priority-low input:checked + label {
+      border-color: var(--success);
+      color: var(--success);
+    }
+    .priority-low input:checked + label i { color: var(--success); }
+
+    .priority-medium input:checked + label {
+      border-color: var(--warning);
+      color: var(--warning);
+    }
+    .priority-medium input:checked + label i { color: var(--warning); }
+
+    .priority-high input:checked + label {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+    .priority-high input:checked + label i { color: var(--danger); }
+
+    .submit-btn {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+      color: var(--white);
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+    }
+
+    .submit-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Success State */
+    .success-state {
+      display: none;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .success-state.show {
+      display: block;
+    }
+
+    .success-icon {
+      width: 80px;
+      height: 80px;
+      background: var(--success);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      animation: pulse 0.5s ease;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    .success-icon i {
+      font-size: 2.5rem;
+      color: var(--white);
+    }
+
+    .success-state h2 {
+      color: var(--gray-800);
+      margin-bottom: 0.5rem;
+    }
+
+    .success-state p {
+      color: var(--gray-500);
+      margin-bottom: 1.5rem;
+    }
+
+    .new-ticket-btn {
+      padding: 0.75rem 1.5rem;
+      background: var(--primary);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .new-ticket-btn:hover {
+      background: var(--primary-dark);
+    }
+
+    /* Dashboard Link */
+    .dashboard-link {
+      display: block;
+      text-align: center;
+      margin-top: 1.5rem;
+      color: var(--gray-500);
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+
+    .dashboard-link:hover {
+      color: var(--primary);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--gray-800);
+      color: var(--white);
+      padding: 1rem 1.5rem;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      z-index: 1000;
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .toast i {
+      color: var(--success);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 480px) {
+      .portal-body {
+        padding: 1.5rem;
+      }
+
+      .portal-header {
+        padding: 1.5rem;
+      }
+
+      .portal-header i {
+        font-size: 2.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="portal-container">
+    <div class="portal-header">
+      <i class="fas fa-bolt"></i>
+      <h1>Quick Ticket</h1>
+      <p>Submit your query in seconds</p>
+    </div>
+
+    <div class="portal-body">
+      <!-- Form -->
+      <form id="quickTicketForm">
+        <div class="form-group">
+          <label for="mobile">
+            <i class="fas fa-mobile-alt"></i> Mobile Number
+          </label>
+          <input type="tel" id="mobile" placeholder="Enter 10-digit mobile number (e.g., 9876543210)" required pattern="[1-9][0-9]{9}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
+        </div>
+
+        <div class="form-group">
+          <label for="product">
+            <i class="fas fa-box"></i> Product
+          </label>
+          <select id="product" required>
+            <option value="">Select Product</option>
+            <option value="POS">POS</option>
+            <option value="Payroll">Payroll</option>
+            <option value="Task">Task</option>
+            <option value="Reservation">Reservation</option>
+            <option value="Retail">Retail</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="language">
+            <i class="fas fa-language"></i> Language
+          </label>
+          <input type="text" id="language" placeholder="Enter language (e.g., English, Hindi, Marathi)" required>
+        </div>
+
+        <div class="form-group">
+          <label for="queries">
+            <i class="fas fa-question-circle"></i> Queries
+          </label>
+          <textarea id="queries" placeholder="Describe your issue or question..." required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <i class="fas fa-flag"></i> Priority Level
+          </label>
+          <div class="priority-group">
+            <div class="priority-option priority-low">
+              <input type="radio" name="priority" id="priorityLow" value="Low">
+              <label for="priorityLow">
+                <i class="fas fa-arrow-down"></i>
+                <span>Low</span>
+              </label>
+            </div>
+            <div class="priority-option priority-medium">
+              <input type="radio" name="priority" id="priorityMedium" value="Medium" checked>
+              <label for="priorityMedium">
+                <i class="fas fa-minus"></i>
+                <span>Medium</span>
+              </label>
+            </div>
+            <div class="priority-option priority-high">
+              <input type="radio" name="priority" id="priorityHigh" value="High">
+              <label for="priorityHigh">
+                <i class="fas fa-arrow-up"></i>
+                <span>High</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn">
+          <i class="fas fa-paper-plane"></i> Submit Ticket
+        </button>
+      </form>
+
+      <!-- Success State -->
+      <div class="success-state" id="successState">
+        <div class="success-icon">
+          <i class="fas fa-check"></i>
+        </div>
+        <h2>Ticket Submitted!</h2>
+        <p>Your ticket has been received. An admin will assign it to a trainer.</p>
+        <button class="new-ticket-btn" onclick="resetForm()">
+          <i class="fas fa-plus"></i> Submit Another Ticket
+        </button>
+      </div>
+
+      <a href="index.html" class="dashboard-link">
+        <i class="fas fa-external-link-alt"></i> Open Admin Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">
+    <i class="fas fa-check-circle"></i>
+    <span id="toastMessage">Ticket submitted!</span>
+  </div>
+
+  <script>
+    // Shared database keys - MUST match index.html app.js
+    const DB_KEYS = {
+      TICKETS: 'selfTicket_tickets',
+      TRAINERS: 'selfTicket_trainers',
+      TICKET_COUNTER: 'selfTicket_counter',
+      ASSIGNMENT_HISTORY: 'selfTicket_assignment_history',
+      AGENT_ROTATION: 'selfTicket_agent_rotation',
+      AVAILABLE_AGENTS: 'selfTicket_available_agents'
+    };
+
+    // Initialize data stores
+    function initializeData() {
+      if (!localStorage.getItem(DB_KEYS.TICKETS)) {
+        localStorage.setItem(DB_KEYS.TICKETS, JSON.stringify([]));
+      }
+      if (!localStorage.getItem(DB_KEYS.TRAINERS)) {
+        const sampleTrainers = [
+          { id: 1, name: 'Alice Johnson', status: 'Available', load: 2 },
+          { id: 2, name: 'Bob Smith', status: 'Busy', load: 5 },
+          { id: 3, name: 'Carol Williams', status: 'Available', load: 1 }
+        ];
+        localStorage.setItem(DB_KEYS.TRAINERS, JSON.stringify(sampleTrainers));
+      }
+      if (!localStorage.getItem(DB_KEYS.TICKET_COUNTER)) {
+        localStorage.setItem(DB_KEYS.TICKET_COUNTER, '1000');
+      }
+      
+      // Initialize round-robin agents if not exists
+      if (!localStorage.getItem(DB_KEYS.AVAILABLE_AGENTS)) {
+        const defaultAgents = [
+          { id: 1, email: 'alice@company.com', name: 'Alice Johnson', status: 'Active', assignedCount: 0 },
+          { id: 2, email: 'bob@company.com', name: 'Bob Smith', status: 'Active', assignedCount: 0 },
+          { id: 3, email: 'carol@company.com', name: 'Carol Williams', status: 'Active', assignedCount: 0 }
+        ];
+        localStorage.setItem(DB_KEYS.AVAILABLE_AGENTS, JSON.stringify(defaultAgents));
+      }
+      
+      if (!localStorage.getItem(DB_KEYS.AGENT_ROTATION)) {
+        localStorage.setItem(DB_KEYS.AGENT_ROTATION, '0');
+      }
+      
+      if (!localStorage.getItem(DB_KEYS.ASSIGNMENT_HISTORY)) {
+        localStorage.setItem(DB_KEYS.ASSIGNMENT_HISTORY, JSON.stringify([]));
+      }
+    }
+
+    // Round-robin assignment functions
+    let availableAgents = [];
+    let rotationIndex = 0;
+    let assignmentHistory = [];
+
+    function loadRoundRobinData() {
+      const savedAgents = localStorage.getItem(DB_KEYS.AVAILABLE_AGENTS);
+      if (savedAgents) {
+        availableAgents = JSON.parse(savedAgents);
+      }
+      
+      const savedIndex = localStorage.getItem(DB_KEYS.AGENT_ROTATION);
+      if (savedIndex) {
+        rotationIndex = parseInt(savedIndex, 10);
+      }
+      
+      const savedHistory = localStorage.getItem(DB_KEYS.ASSIGNMENT_HISTORY);
+      if (savedHistory) {
+        assignmentHistory = JSON.parse(savedHistory);
+      }
+    }
+
+    function saveAvailableAgents() {
+      localStorage.setItem(DB_KEYS.AVAILABLE_AGENTS, JSON.stringify(availableAgents));
+    }
+
+    function saveRotationIndex() {
+      localStorage.setItem(DB_KEYS.AGENT_ROTATION, rotationIndex.toString());
+    }
+
+    function saveAssignmentHistory() {
+      localStorage.setItem(DB_KEYS.ASSIGNMENT_HISTORY, JSON.stringify(assignmentHistory));
+    }
+
+    function getNextAgent() {
+      const activeAgents = availableAgents.filter(agent => agent.status === 'Active');
+      
+      if (activeAgents.length === 0) {
+        return null;
+      }
+
+      const agent = activeAgents[rotationIndex % activeAgents.length];
+      rotationIndex = (rotationIndex + 1) % activeAgents.length;
+      saveRotationIndex();
+
+      return agent;
+    }
+
+    function autoAssignTicket(ticket) {
+      const agent = getNextAgent();
+      
+      if (!agent) {
+        return null;
+      }
+
+      ticket.assignedTrainer = agent.email;
+      ticket.assignedAgentName = agent.name;
+      ticket.assignedAgentId = agent.id;
+      ticket.assignedAt = new Date().toISOString();
+      ticket.assignmentMethod = 'Round-Robin';
+
+      // Record assignment in history
+      const record = {
+        id: Date.now(),
+        ticketId: ticket.id,
+        ticketDetails: {
+          mobileNumber: ticket.mobileNumber,
+          product: ticket.product,
+          priority: ticket.priority,
+          queryDescription: ticket.queryDescription
+        },
+        agentEmail: agent.email,
+        agentName: agent.name,
+        agentId: agent.id,
+        assignedAt: new Date().toISOString(),
+        method: 'Round-Robin'
+      };
+      assignmentHistory.push(record);
+      saveAssignmentHistory();
+
+      // Update agent's assigned count
+      agent.assignedCount = (agent.assignedCount || 0) + 1;
+      saveAvailableAgents();
+
+      return agent;
+    }
+
+    // EmailJS Configuration
+    function getEmailJSConfig() {
+      const saved = localStorage.getItem('emailjsConfig');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+      return { publicKey: '', serviceId: '', templateId: '' };
+    }
+
+    // Send assignment email
+    function sendAssignmentEmail(agent, ticket) {
+      const config = getEmailJSConfig();
+      
+      if (!config.publicKey || !config.serviceId || !config.templateId) {
+        console.log('⚠️ EmailJS not configured - email not sent');
+        return;
+      }
+
+      if (typeof emailjs === 'undefined') {
+        console.log('⚠️ EmailJS library not loaded');
+        return;
+      }
+
+      try {
+        emailjs.init(config.publicKey);
+
+        // Create formatted email content
+        const emailContent = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NEW TICKET ASSIGNED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ticket ID:     ${ticket.id}
+Mobile Number: ${ticket.mobileNumber}
+Product:       ${ticket.product}
+Priority:      ${ticket.priority}
+Query:         ${ticket.queryDescription}
+
+Assigned:      ${new Date().toLocaleString()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Please address this ticket promptly.
+
+Best regards,
+Self-Ticket Support System
+        `;
+
+        const templateParams = {
+          to_email: agent.email,
+          ticket_id: ticket.id,
+          mobile_number: ticket.mobileNumber,
+          product: ticket.product,
+          query_description: ticket.queryDescription,
+          priority: ticket.priority,
+          status: 'Assigned',
+          assigned_date: new Date().toLocaleString(),
+          email_content: emailContent
+        };
+
+        emailjs.send(config.serviceId, config.templateId, templateParams)
+          .then((response) => {
+            console.log('✅ Email sent successfully to', agent.email);
+          })
+          .catch((error) => {
+            console.error('❌ Email sending failed:', error);
+          });
+      } catch (error) {
+        console.error('❌ EmailJS error:', error);
+      }
+    }
+
+    function getTickets() {
+      return JSON.parse(localStorage.getItem(DB_KEYS.TICKETS) || '[]');
+    }
+
+    function getTrainers() {
+      return JSON.parse(localStorage.getItem(DB_KEYS.TRAINERS) || '[]');
+    }
+
+    function getTicketCounter() {
+      return parseInt(localStorage.getItem(DB_KEYS.TICKET_COUNTER) || '1000');
+    }
+
+    function saveTickets(tickets) {
+      localStorage.setItem(DB_KEYS.TICKETS, JSON.stringify(tickets));
+    }
+
+    function saveTrainers(trainers) {
+      localStorage.setItem(DB_KEYS.TRAINERS, JSON.stringify(trainers));
+    }
+
+    function saveTicketCounter(counter) {
+      localStorage.setItem(DB_KEYS.TICKET_COUNTER, counter.toString());
+    }
+
+    function generateTicketId() {
+      const counter = getTicketCounter();
+      const newCounter = counter + 1;
+      saveTicketCounter(newCounter);
+      return `TKT-${newCounter}`;
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toastMessage');
+      toastMessage.textContent = message;
+      toast.classList.add('show');
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 4000);
+    }
+
+    function assignTicketToTrainer(ticketId) {
+      const trainers = getTrainers();
+      const tickets = getTickets();
+      
+      const availableTrainers = trainers.filter(t => t.status === 'Available');
+      
+      if (availableTrainers.length === 0) {
+        showToast('⚠️ No trainers available! Ticket queued.');
+        return null;
+      }
+      
+      availableTrainers.sort((a, b) => a.load - b.load);
+      const selectedTrainer = availableTrainers[0];
+      
+      const trainerIndex = trainers.findIndex(t => t.id === selectedTrainer.id);
+      trainers[trainerIndex].load += 1;
+      saveTrainers(trainers);
+      
+      const ticketIndex = tickets.findIndex(t => t.id === ticketId);
+      if (ticketIndex !== -1) {
+        tickets[ticketIndex].assignedTrainer = selectedTrainer.name;
+        tickets[ticketIndex].status = 'In-Progress';
+        saveTickets(tickets);
+      }
+      
+      return selectedTrainer.name;
+    }
+
+    // Form submission
+    const form = document.getElementById('quickTicketForm');
+    const successState = document.getElementById('successState');
+
+    // Mobile Number Validation Function
+    function validateMobileNumber(mobileNumber) {
+      // Remove any whitespace or special characters
+      const cleaned = mobileNumber.replace(/\s/g, '');
+      
+      // Check if empty
+      if (!cleaned || cleaned.length === 0) {
+        return { valid: false, message: 'Mobile number is required' };
+      }
+      
+      // Check if contains only digits
+      if (!/^\d+$/.test(cleaned)) {
+        return { valid: false, message: 'Mobile number must contain only digits (0-9)' };
+      }
+      
+      // Check if exactly 10 digits
+      if (cleaned.length !== 10) {
+        return { valid: false, message: 'Mobile number must be exactly 10 digits' };
+      }
+      
+      // Check if first digit is not 0 (no leading zeros)
+      if (cleaned.charAt(0) === '0') {
+        return { valid: false, message: 'Mobile number cannot start with 0' };
+      }
+      
+      // Check if first digit is valid (1-9 for Indian mobile numbers)
+      const firstDigit = parseInt(cleaned.charAt(0), 10);
+      if (firstDigit < 1 || firstDigit > 9) {
+        return { valid: false, message: 'Mobile number must start with a digit between 1-9' };
+      }
+      
+      // All checks passed
+      return { valid: true, message: 'Valid', cleanedNumber: cleaned };
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const mobile = document.getElementById('mobile').value;
+      const product = document.getElementById('product').value;
+      const language = document.getElementById('language').value;
+      const queries = document.getElementById('queries').value;
+      const priority = document.querySelector('input[name="priority"]:checked').value;
+      
+      // Validate mobile number
+      const mobileValidation = validateMobileNumber(mobile);
+      if (!mobileValidation.valid) {
+        showToast('❌ ' + mobileValidation.message);
+        return;
+      }
+      
+      const tickets = getTickets();
+      
+      // Create new ticket - use same schema as dashboard expects
+      const newTicket = {
+        id: generateTicketId(),
+        timestamp: new Date().toISOString(),
+        mobileNumber: mobileValidation.cleanedNumber,
+        product: product,
+        language: language,
+        queryDescription: queries,
+        priority: priority,
+        category: product,
+        status: 'Open',
+        assignedTrainer: null,
+        assignedAgentName: null,
+        assignedAgentId: null,
+        assignedAt: null,
+        assignmentMethod: null,
+        resolvedAt: null,
+        isQuickTicket: true
+      };
+      
+      // Auto-assign using round-robin
+      const assignedAgent = autoAssignTicket(newTicket);
+      
+      if (assignedAgent) {
+        showToast('✅ Ticket assigned to ' + assignedAgent.email);
+        // Send email notification to the assigned agent
+        sendAssignmentEmail(assignedAgent, newTicket);
+      } else {
+        showToast('⚠️ Ticket submitted - no agents available');
+      }
+      
+      tickets.push(newTicket);
+      saveTickets(tickets);
+      
+      // Show success
+      form.style.display = 'none';
+      successState.classList.add('show');
+      
+      showToast('✅ Ticket submitted successfully!');
+    });
+
+    function resetForm() {
+      form.reset();
+      form.style.display = 'block';
+      successState.classList.remove('show');
+    }
+
+    // Initialize
+    initializeData();
+    loadRoundRobinData();
+  </script>
+</body>
+</html>
