@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Ticket - Submit Your Query</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --white: #ffffff;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .portal-container {
+      background: var(--white);
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      width: 100%;
+      max-width: 480px;
+      overflow: hidden;
+    }
+    .portal-header {
+      background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+      color: var(--white);
+      padding: 2rem;
+      text-align: center;
+    }
+    .portal-header i { font-size: 3rem; margin-bottom: 0.5rem; }
+    .portal-header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .portal-header p { opacity: 0.9; font-size: 0.9rem; }
+    .portal-body { padding: 2rem; }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+    .form-group label i { color: var(--primary); width: 16px; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      border: 2px solid var(--gray-200);
+      border-radius: 10px;
+      font-size: 1rem;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      background: var(--gray-50);
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: var(--white);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+    .form-group textarea { resize: none; min-height: 100px; }
+    .priority-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+    .priority-option { position: relative; }
+    .priority-option input { position: absolute; opacity: 0; cursor: pointer; }
+    .priority-option label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      border: 2px solid var(--gray-200);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 0;
+    }
+    .priority-option label:hover { border-color: var(--gray-400); }
+    .priority-option input:checked + label {
+      border-color: var(--primary);
+      background: rgba(79, 70, 229, 0.05);
+    }
+    .priority-option label i { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .priority-option label span { font-size: 0.8rem; font-weight: 600; }
+    .priority-low input:checked + label { border-color: var(--success); color: var(--success); }
+    .priority-low input:checked + label i { color: var(--success); }
+    .priority-medium input:checked + label { border-color: var(--warning); color: var(--warning); }
+    .priority-medium input:checked + label i { color: var(--warning); }
+    .priority-high input:checked + label { border-color: var(--danger); color: var(--danger); }
+    .priority-high input:checked + label i { color: var(--danger); }
+    .submit-btn {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+      color: var(--white);
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+    }
+    .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3); }
+    .success-state { display: none; text-align: center; padding: 2rem; }
+    .success-state.show { display: block; }
+    .success-icon {
+      width: 80px;
+      height: 80px;
+      background: var(--success);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      animation: pulse 0.5s ease;
+    }
+    @keyframes pulse { 0% { transform: scale(0); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    .success-icon i { font-size: 2.5rem; color: var(--white); }
+    .success-state h2 { color: var(--gray-800); margin-bottom: 0.5rem; }
+    .success-state p { color: var(--gray-500); margin-bottom: 1.5rem; }
+    .new-ticket-btn {
+      padding: 0.75rem 1.5rem;
+      background: var(--primary);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .new-ticket-btn:hover { background: var(--primary-dark); }
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--gray-800);
+      color: var(--white);
+      padding: 1rem 1.5rem;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      z-index: 1000;
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast i { color: var(--success); }
+    @media (max-width: 480px) {
+      .portal-body { padding: 1.5rem; }
+      .portal-header { padding: 1.5rem; }
+      .portal-header i { font-size: 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="portal-container">
+    <div class="portal-header">
+      <i class="fas fa-bolt"></i>
+      <h1>Quick Ticket</h1>
+      <p>Submit your query in seconds</p>
+    </div>
+
+    <div class="portal-body">
+      <form id="quickTicketForm">
+        <div class="form-group">
+          <label for="mobile"><i class="fas fa-mobile-alt"></i> Mobile Number</label>
+          <input type="tel" id="mobile" placeholder="Enter 10-digit mobile number" required pattern="[1-9][0-9]{9}" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
+        </div>
+
+        <div class="form-group">
+          <label for="product"><i class="fas fa-box"></i> Product</label>
+          <select id="product" required>
+            <option value="">Select Product</option>
+            <option value="POS">POS</option>
+            <option value="Payroll">Payroll</option>
+            <option value="Task">Task</option>
+            <option value="Reservation">Reservation</option>
+            <option value="Retail">Retail</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="language"><i class="fas fa-language"></i> Language</label>
+          <input type="text" id="language" placeholder="Enter language (e.g., English, Hindi)" required>
+        </div>
+
+        <div class="form-group">
+          <label for="queries"><i class="fas fa-question-circle"></i> Queries</label>
+          <textarea id="queries" placeholder="Describe your issue or question..." required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label><i class="fas fa-flag"></i> Priority Level</label>
+          <div class="priority-group">
+            <div class="priority-option priority-low">
+              <input type="radio" name="priority" id="priorityLow" value="Low">
+              <label for="priorityLow"><i class="fas fa-arrow-down"></i><span>Low</span></label>
+            </div>
+            <div class="priority-option priority-medium">
+              <input type="radio" name="priority" id="priorityMedium" value="Medium" checked>
+              <label for="priorityMedium"><i class="fas fa-minus"></i><span>Medium</span></label>
+            </div>
+            <div class="priority-option priority-high">
+              <input type="radio" name="priority" id="priorityHigh" value="High">
+              <label for="priorityHigh"><i class="fas fa-arrow-up"></i><span>High</span></label>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn">
+          <i class="fas fa-paper-plane"></i> Submit Ticket
+        </button>
+      </form>
+
+      <div class="success-state" id="successState">
+        <div class="success-icon"><i class="fas fa-check"></i></div>
+        <h2>Ticket Submitted!</h2>
+        <p id="successMessage">Your ticket has been submitted successfully.</p>
+        <button class="new-ticket-btn" onclick="resetForm()">
+          <i class="fas fa-plus"></i> Submit Another Ticket
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <i class="fas fa-check-circle"></i>
+    <span id="toastMessage">Ticket submitted!</span>
+  </div>
+
+  <script>
+    // ==================== CONFIGURATION ====================
+    // Replace with your Google Apps Script URL
+    const GOOGLE_SHEET_API = "YOUR_GOOGLE_SCRIPT_URL_HERE";
+    
+    // Replace with your EmailJS credentials
+    const EMAILJS_CONFIG = {
+      publicKey: "YOUR_PUBLIC_KEY",
+      serviceId: "YOUR_SERVICE_ID", 
+      templateId: "YOUR_TEMPLATE_ID"
+    };
+    
+    // Round-robin agents (hardcoded or load from somewhere)
+    const AGENTS = [
+      { email: "abhay.padhiyar@petpooja.com", name: "Abhay" },
+      { email: "milan.patel@petpooja.com", name: "Milan" }
+    ];
+    // =====================================================
+
+    let rotationIndex = 0;
+
+    function getNextAgent() {
+      if (AGENTS.length === 0) return null;
+      const agent = AGENTS[rotationIndex % AGENTS.length];
+      rotationIndex = (rotationIndex + 1) % AGENTS.length;
+      return agent;
+    }
+
+    function validateMobileNumber(mobileNumber) {
+      const cleaned = mobileNumber.replace(/\s/g, '');
+      if (!cleaned || cleaned.length !== 10) {
+        return { valid: false, message: 'Enter valid 10-digit mobile number' };
+      }
+      if (cleaned.charAt(0) === '0') {
+        return { valid: false, message: 'Mobile cannot start with 0' };
+      }
+      return { valid: true, cleanedNumber: cleaned };
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 4000);
+    }
+
+    function sendEmail(agent, ticket) {
+      if (!EMAILJS_CONFIG.publicKey || !EMAILJS_CONFIG.serviceId || !EMAILJS_CONFIG.templateId) {
+        console.log('EmailJS not configured');
+        return;
+      }
+      if (typeof emailjs === 'undefined') {
+        console.log('EmailJS not loaded');
+        return;
+      }
+      try {
+        emailjs.init(EMAILJS_CONFIG.publicKey);
+        emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+          to_email: agent.email,
+          ticket_id: ticket.id,
+          mobile_number: ticket.mobileNumber,
+          product: ticket.product,
+          query_description: ticket.queryDescription,
+          priority: ticket.priority,
+          assigned_date: new Date().toLocaleString()
+        }).then(() => {
+          console.log('Email sent to', agent.email);
+        }).catch(err => {
+          console.error('Email failed', err);
+        });
+      } catch(e) {
+        console.error('Email error', e);
+      }
+    }
+
+    async function submitToGoogleSheet(ticket) {
+      if (GOOGLE_SHEET_API === "YOUR_GOOGLE_SCRIPT_URL_HERE") {
+        console.log('Google Sheet API not configured');
+        return null;
+      }
+      try {
+        const response = await fetch(GOOGLE_SHEET_API, {
+          method: 'POST',
+          body: JSON.stringify(ticket)
+        });
+        return await response.json();
+      } catch(e) {
+        console.error('Sheet submission failed', e);
+        return null;
+      }
+    }
+
+    document.getElementById('quickTicketForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const mobile = document.getElementById('mobile').value;
+      const product = document.getElementById('product').value;
+      const language = document.getElementById('language').value;
+      const queries = document.getElementById('queries').value;
+      const priority = document.querySelector('input[name="priority"]:checked').value;
+
+      const validation = validateMobileNumber(mobile);
+      if (!validation.valid) {
+        showToast('❌ ' + validation.message);
+        return;
+      }
+
+      const ticket = {
+        id: 'TKT-' + Date.now(),
+        timestamp: new Date().toISOString(),
+        mobileNumber: validation.cleanedNumber,
+        product: product,
+        language: language,
+        queryDescription: queries,
+        priority: priority,
+        status: 'Open',
+        assignedTo: null,
+        assignedAt: null
+      };
+
+      // Auto-assign to agent
+      const agent = getNextAgent();
+      if (agent) {
+        ticket.assignedTo = agent.email;
+        ticket.assignedAt = new Date().toISOString();
+        sendEmail(agent, ticket);
+        showToast('✅ Ticket assigned to ' + agent.email);
+      } else {
+        showToast('⚠️ No agents available');
+      }
+
+      // Submit to Google Sheet
+      await submitToGoogleSheet(ticket);
+
+      document.getElementById('quickTicketForm').style.display = 'none';
+      document.getElementById('successState').classList.add('show');
+    });
+
+    function resetForm() {
+      document.getElementById('quickTicketForm').reset();
+      document.getElementById('quickTicketForm').style.display = 'block';
+      document.getElementById('successState').classList.remove('show');
+    }
+  </script>
+</body>
+</html>
