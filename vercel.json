@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/trainer-portal.html" },
+    { "source": "/", "destination": "/trainer-portal-api.html" },
     { "source": "/dashboard", "destination": "/index.html" }
   ]
 }
