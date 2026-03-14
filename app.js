@@ -33,12 +33,8 @@ function initializeRoundRobinSystem() {
   if (savedAgents) {
     availableAgents = JSON.parse(savedAgents);
   } else {
-    // Default agents
-    availableAgents = [
-      { id: 1, email: 'alice@company.com', name: 'Alice Johnson', status: 'Active', assignedCount: 0 },
-      { id: 2, email: 'bob@company.com', name: 'Bob Smith', status: 'Active', assignedCount: 0 },
-      { id: 3, email: 'carol@company.com', name: 'Carol Williams', status: 'Active', assignedCount: 0 }
-    ];
+    // Default agents - these will be replaced when user adds their own
+    availableAgents = [];
     saveAvailableAgents();
   }
 

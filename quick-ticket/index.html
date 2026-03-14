@@ -461,12 +461,8 @@
       
       // Initialize round-robin agents if not exists
       if (!localStorage.getItem(DB_KEYS.AVAILABLE_AGENTS)) {
-        const defaultAgents = [
-          { id: 1, email: 'alice@company.com', name: 'Alice Johnson', status: 'Active', assignedCount: 0 },
-          { id: 2, email: 'bob@company.com', name: 'Bob Smith', status: 'Active', assignedCount: 0 },
-          { id: 3, email: 'carol@company.com', name: 'Carol Williams', status: 'Active', assignedCount: 0 }
-        ];
-        localStorage.setItem(DB_KEYS.AVAILABLE_AGENTS, JSON.stringify(defaultAgents));
+        // Start with empty agents - user will add their own
+        localStorage.setItem(DB_KEYS.AVAILABLE_AGENTS, JSON.stringify([]));
       }
       
       if (!localStorage.getItem(DB_KEYS.AGENT_ROTATION)) {
