@@ -1081,46 +1081,50 @@ function checkEmailJSConfiguration() {
 }
 
 // ===== Helper Functions =====
-function setupTabSwitching() {
+function switchTab(tabId) {
   const tabButtons = document.querySelectorAll('.tab-btn');
   const tabContents = document.querySelectorAll('.tab-content');
+  
+  // Remove active class from all buttons and contents
+  tabButtons.forEach(btn => btn.classList.remove('active'));
+  tabContents.forEach(content => content.classList.remove('active'));
+  
+  // Add active class to selected button
+  const selectedButton = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+  if (selectedButton) {
+    selectedButton.classList.add('active');
+  }
+  
+  // Show selected tab content
+  const selectedContent = document.getElementById(tabId);
+  if (selectedContent) {
+    selectedContent.classList.add('active');
+  }
+  
+  // Update archive list when switching to archive tab
+  if (tabId === 'archive') {
+    updateArchiveList();
+  }
+  
+  // Update agent list when switching to agents tab
+  if (tabId === 'agents') {
+    updateAvailableAgentsList();
+    updateAssignmentHistory();
+  }
+  
+  // Update reports when switching to reports tab
+  if (tabId === 'reports') {
+    updateAssignmentStats();
+  }
+}
+
+function setupTabSwitching() {
+  const tabButtons = document.querySelectorAll('.tab-btn');
   
   tabButtons.forEach(button => {
     button.addEventListener('click', () => {
       const tabId = button.getAttribute('data-tab');
-      
-      // Remove active class from all buttons
-      tabButtons.forEach(btn => btn.classList.remove('active'));
-      
-      // Add active class to clicked button
-      button.classList.add('active');
-      
-      // Hide all tab contents
-      tabContents.forEach(content => {
-        content.style.display = 'none';
-      });
-      
-      // Show selected tab content
-      const selectedContent = document.getElementById(tabId);
-      if (selectedContent) {
-        selectedContent.style.display = 'block';
-      }
-      
-      // Update archive list when switching to archive tab
-      if (tabId === 'archive') {
-        updateArchiveList();
-      }
-      
-      // Update agent list when switching to agents tab
-      if (tabId === 'agents') {
-        updateAvailableAgentsList();
-        updateAssignmentHistory();
-      }
-      
-      // Update reports when switching to reports tab
-      if (tabId === 'reports') {
-        updateAssignmentStats();
-      }
+      switchTab(tabId);
     });
   });
 }
@@ -1433,6 +1437,7 @@ globalThis.updateLanguageFilter = updateLanguageFilter;
 // Round-robin functions
 globalThis.initializeRoundRobinSystem = initializeRoundRobinSystem;
 globalThis.updateAvailableAgentsList = updateAvailableAgentsList;
+globalThis.switchTab = switchTab;
 globalThis.toggleAgentStatus = toggleAgentStatus;
 globalThis.removeAgentFromList = removeAgentFromList;
 globalThis.addNewAgent = addNewAgent;

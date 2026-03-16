@@ -48,6 +48,12 @@
                   style="padding: 0.5rem 1rem; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
                   <i class="fas fa-sync"></i> Refresh
                 </button>
+                <button onclick="syncAllTicketsToGoogleSheet()"
+                  id="googleSyncBtn"
+                  style="padding: 0.5rem 1rem; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: none; align-items: center; gap: 0.5rem;"
+                  title="Sync all tickets to Google Sheets">
+                  <i class="fas fa-cloud-upload-alt"></i> Sync to Cloud
+                </button>
             </div>
           <div class="queue-filters">
             <select id="urgencyFilter" onchange="filterTickets()">
@@ -154,9 +160,46 @@
 
       <!-- Settings Tab -->
       <section id="settings" class="tab-content">
-        <h2><i class="fas fa-cog"></i> EmailJS Configuration</h2>
+        <h2><i class="fas fa-cog"></i> Configuration</h2>
         <div
           style="max-width: 600px; background: white; padding: 2rem; border-radius: 10px; border: 1px solid #e5e7eb;">
+          
+          <!-- Google Sheets Sync Section -->
+          <div
+            style="background: #eff6ff; padding: 1.5rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #3b82f6;">
+            <h3 style="margin: 0 0 0.5rem 0; color: #3b82f6;">
+              <i class="fas fa-cloud"></i> Google Sheets Cloud Sync
+            </h3>
+            <p style="color: #6b7280; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+              Enable cloud storage to sync tickets across devices using Google Sheets
+            </p>
+          </div>
+
+          <form id="googleSheetsConfigForm" style="margin-bottom: 2rem;">
+            <div style="margin-bottom: 1rem;">
+              <label for="googleScriptUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
+                Google Apps Script URL
+              </label>
+              <input type="url" id="googleScriptUrl" placeholder="https://script.google.com/macros/s/..."
+                value="https://script.google.com/macros/s/AKfycbxG6VZG9N6W4L5M0kL4kJ6nH8vT2xY8zQ9kR1sL3mN5pQ7rS9tU0vW2xY4Z6aB8cD0eF/exec"
+                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
+              <p style="margin: 0.5rem 0 0 0; color: #6b7280; font-size: 0.85rem;">
+                Get this from: Google Apps Script deployment → Web app URL
+              </p>
+            </div>
+
+            <button type="submit"
+              style="width: 100%; padding: 0.75rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">
+              <i class="fas fa-sync"></i>
+              Enable Cloud Sync
+            </button>
+          </form>
+
+          <div id="cloudSyncStatus" style="margin: 1rem 0; padding: 1rem; border-radius: 6px; display: none;"></div>
+
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 2rem 0;">
+
+          <!-- EmailJS Section -->
           <div
             style="background: #f0f4ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #4f46e5;">
             <p style="color: #4f46e5; margin: 0; font-weight: 600;">
@@ -322,6 +365,23 @@
   </div>
 
   <script src="app.js"></script>
+  <script>
+    // Test if switchTab is available
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('✅ Page loaded successfully');
+      console.log('🔧 switchTab function exists:', typeof window.switchTab === 'function');
+      console.log('📋 Tab buttons found:', document.querySelectorAll('.tab-btn').length);
+      
+      // Test click on settings
+      const settingsBtn = document.querySelector('.tab-btn[data-tab="settings"]');
+      if (settingsBtn) {
+        console.log('⚙️ Settings button found');
+        settingsBtn.addEventListener('click', () => {
+          console.log('🖱️ Settings button clicked!');
+        });
+      }
+    });
+  </script>
 </body>
 
 </html>

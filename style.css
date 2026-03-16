@@ -23,6 +23,26 @@
   transition: all 0.2s;
 }
 
+/* Tab Content */
+.tab-content {
+  display: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.tab-content.active {
+  display: block;
+  opacity: 1;
+}
+
+/* Ensure tab buttons are clickable */
+.nav-tabs .tab-btn {
+  position: relative;
+  z-index: 10;
+  cursor: pointer;
+  user-select: none;
+}
+
 .tab-btn:hover {
   background: #cbd5e1;
 }
@@ -30,6 +50,7 @@
 .tab-btn.active {
   background: #4f46e5;
   color: white;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
 /* Tab Content */

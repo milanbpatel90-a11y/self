@@ -255,7 +255,7 @@
   <script>
     // ==================== CONFIGURATION ====================
     // Replace with your Google Apps Script URL
-    const GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbz2hmmAZkgHbkjF2gZuurJCtOUvTQhTZR-v09ja924YHXerNcwy61XArp51x2DMPxSD/exec";
+    const GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbxG6VZG9N6W4L5M0kL4kJ6nH8vT2xY8zQ9kR1sL3mN5pQ7rS9tU0vW2xY4Z6aB8cD0eF/exec";
     
     // Replace with your EmailJS credentials
     const EMAILJS_CONFIG = {
@@ -335,9 +335,14 @@
       try {
         const response = await fetch(GOOGLE_SHEET_API, {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify(ticket)
         });
-        return await response.json();
+        const result = await response.json();
+        console.log('Google Sheet response:', result);
+        return result;
       } catch(e) {
         console.error('Sheet submission failed', e);
         return null;
@@ -360,23 +365,25 @@
       }
 
       const ticket = {
-        id: 'TKT-' + Date.now(),
-        timestamp: new Date().toISOString(),
+        ticketId: 'TKT-' + Date.now(),
+        mobile: validation.cleanedNumber,
         mobileNumber: validation.cleanedNumber,
         product: product,
         language: language,
+        query: queries,
         queryDescription: queries,
         priority: priority,
         status: 'Open',
         assignedTo: null,
-        assignedAt: null
+        CreatedTime: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       };
 
       // Auto-assign to agent
       const agent = getNextAgent();
       if (agent) {
         ticket.assignedTo = agent.email;
-        ticket.assignedAt = new Date().toISOString();
+        ticket.CreatedTime = new Date().toISOString();
         sendEmail(agent, ticket);
         showToast('✅ Ticket assigned to ' + agent.email);
       } else {

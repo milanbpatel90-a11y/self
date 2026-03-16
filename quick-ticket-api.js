@@ -1,5 +1,5 @@
 // Google Apps Script Web App URL - REPLACE WITH YOUR DEPLOYED URL
-const API_URL = "https://script.google.com/macros/s/AKfycbz2hmmAZkgHbkjF2gZuurJCtOUvTQhTZR-v09ja924YHXerNcwy61XArp51x2DMPxSD/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwGslRWDYm8wBtrVzAdhjOLIpT5b60LCSFtTbnUuW6qxD46-vtd-1odlM_B7vlzFpY/exec";
 
 // DB_KEYS - using Google Sheets via API
 const DB_KEYS = {
@@ -122,11 +122,18 @@ function autoAssignTicket(ticket) {
 
 // EmailJS Configuration
 function getEmailJSConfig() {
+  // First check localStorage
   const saved = localStorage.getItem('emailjsConfig');
   if (saved) {
     return JSON.parse(saved);
   }
-  return { publicKey: '', serviceId: '', templateId: '' };
+  
+  // Default configuration
+  return { 
+    publicKey: 'uDqRwErVJMTN74RF0', 
+    serviceId: 'service_auxspig', 
+    templateId: 'template_76vdopc' 
+  };
 }
 
 // Send assignment email
