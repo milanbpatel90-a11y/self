@@ -6,8 +6,17 @@ const DB_KEYS = {
   TICKET_COUNTER: 'selfTicket_counter',
   ASSIGNMENT_HISTORY: 'selfTicket_assignment_history',
   AGENT_ROTATION: 'selfTicket_agent_rotation',
-  AVAILABLE_AGENTS: 'selfTicket_available_agents'
+  AVAILABLE_AGENTS: 'selfTicket_available_agents',
+  GOOGLE_SCRIPT_URL: 'selfTicket_google_script_url',
+  LAST_QUICK_QUERY_RESPONSE: 'selfTicket_last_quick_query_response'
 };
+
+const DEFAULT_GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbDf1n2vQ57ybTAt2QAvTJFHhr4XCmT0DTejbDYKBvrmt8Tz9ZNYAsjnIY6AMGB6A/exec';
+const LEGACY_GOOGLE_SCRIPT_URLS = [
+  'https://script.google.com/macros/s/AKfycbyqC6442w0hqOQga0vTOeO7BnoShm4j7DEPg-oxoo3lHtkdMEk03yHGePQbz7fkv_M/exec',
+  'https://script.google.com/macros/s/AKfycbyM_0PLWNX4OupfzWS5bONAuHVZNBUapIz-DSti9zNa51IpFKD-WnnX_zh9Z2lqf8A/exec',
+  'https://script.google.com/macros/s/AKfycbwC-YDLimZYxK51V_HqFtk32V64mGt6rVEE9IMUvqImsh9SQHEMlmUZfYhAV1nLaEU/exec'
+];
 
 let ticketsArray = [];
 let trainersArray = [
@@ -69,8 +78,20 @@ function saveAssignmentHistory() {
   localStorage.setItem(DB_KEYS.ASSIGNMENT_HISTORY, JSON.stringify(assignmentHistory));
 }
 
+function normalizeLanguageList(value) {
+  if (!value) return [];
+  return value.split(',').map(item => item.trim().toLowerCase()).filter(Boolean);
+}
+
+function agentSupportsLanguage(agent, language) {
+  if (!language) return true;
+  const agentLanguages = normalizeLanguageList(agent.language || '');
+  if (agentLanguages.length === 0) return true;
+  return agentLanguages.includes(language.trim().toLowerCase());
+}
+
 // Get the next agent in round-robin rotation
-function getNextAgent() {
+function getNextAgent(preferredLanguage = '') {
   // Reload agents from localStorage to ensure we have latest
   const savedAgents = localStorage.getItem(DB_KEYS.AVAILABLE_AGENTS);
   if (savedAgents) {
@@ -88,22 +109,26 @@ function getNextAgent() {
     return null;
   }
 
+  const languageMatchedAgents = activeAgents.filter(agent => agentSupportsLanguage(agent, preferredLanguage));
+  const rotationPool = languageMatchedAgents.length > 0 ? languageMatchedAgents : activeAgents;
+
   // Get the next agent in rotation
-  const agent = activeAgents[rotationIndex % activeAgents.length];
+  const agent = rotationPool[rotationIndex % rotationPool.length];
   
   // Increment rotation index for next assignment
-  rotationIndex = (rotationIndex + 1) % activeAgents.length;
+  rotationIndex = (rotationIndex + 1) % rotationPool.length;
   saveRotationIndex();
 
   return agent;
 }
 
 // Add a new agent to the round-robin pool
-function addAgent(name, email) {
+function addAgent(name, email, language) {
   const newAgent = {
     id: Date.now(),
     email: email,
     name: name,
+    language: language,
     status: 'Active',
     assignedCount: 0,
     addedAt: new Date().toISOString()
@@ -175,6 +200,7 @@ function recordAssignment(ticket, agent) {
     },
     agentEmail: agent.email,
     agentName: agent.name,
+    agentLanguage: agent.language || '',
     agentId: agent.id,
     assignedAt: new Date().toISOString(),
     method: 'Round-Robin'
@@ -223,7 +249,7 @@ function getAgentStats() {
 
 // Auto-assign ticket using round-robin
 function autoAssignTicket(ticket) {
-  const agent = getNextAgent();
+  const agent = getNextAgent(ticket.language || '');
   
   if (!agent) {
     console.error('❌ Cannot assign ticket - no active agents available');
@@ -253,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Update agent list in UI
   updateAvailableAgentsList();
+  renderQuickQueryResponse();
   
   // Create a test ticket creation button for debugging
   const testButton = document.createElement('button');
@@ -282,8 +309,10 @@ document.addEventListener('DOMContentLoaded', () => {
   updateArchiveList();
   updateTrainerList();
   setupQuickTicketForm();
+  setupGoogleSheetsConfigForm();
   setupEmailJSConfigForm();
   setupAgentManagementForm();
+  updateCloudSyncUI();
   checkEmailJSConfiguration();
   
   // Setup tab switching
@@ -295,10 +324,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabId = defaultTab.getAttribute('data-tab');
     document.querySelectorAll('.tab-content').forEach(content => {
       content.style.display = 'none';
+      content.classList.remove('active');
     });
     const activeContent = document.getElementById(tabId);
     if (activeContent) {
       activeContent.style.display = 'block';
+      activeContent.classList.add('active');
     }
   }
 
@@ -458,7 +489,7 @@ function setupQuickTicketForm() {
   const form = document.getElementById('quickTicketForm');
   if (!form) return;
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const mobileNumber = document.getElementById('mobile').value.trim();
@@ -494,8 +525,10 @@ function setupQuickTicketForm() {
 
     // Auto-assign ticket using round-robin
     const assignedAgent = autoAssignTicket(newTicket);
+    let emailResult = { success: false, message: 'No assignment email requested.' };
     
     if (assignedAgent) {
+      emailResult = { success: true, message: 'Assignment email requested via Google Apps Script.' };
       showToast('✅ Ticket submitted and auto-assigned to ' + assignedAgent.email, 'success');
     } else {
       showToast('⚠️ Ticket submitted but no agents available for assignment', 'error');
@@ -505,7 +538,247 @@ function setupQuickTicketForm() {
     form.reset();
     updateDashboardQueue();
     saveToLocalStorage();
+
+    const cloudResult = await submitTicketToGoogleSheet(newTicket);
+    if (cloudResult.success) {
+      showCloudSyncStatus('Cloud sync is active. Ticket saved to Google Sheets.', 'success');
+    } else if (getGoogleScriptUrl()) {
+      showCloudSyncStatus(cloudResult.message, 'error');
+    }
+
+    saveQuickQueryResponse({
+      ticketId: newTicket.id,
+      mobileNumber: newTicket.mobileNumber,
+      product: newTicket.product,
+      language: newTicket.language,
+      priority: newTicket.priority,
+      queryDescription: newTicket.queryDescription,
+      assignedAgentName: assignedAgent ? assignedAgent.name : null,
+      assignedTrainer: assignedAgent ? assignedAgent.email : null,
+      assignmentMethod: assignedAgent ? 'Round-Robin' : 'Unassigned',
+      cloudStatus: cloudResult.success ? 'success' : 'error',
+      cloudMessage: cloudResult.message,
+      emailStatus: emailResult.success ? 'success' : 'error',
+      emailMessage: emailResult.message,
+      submittedAt: newTicket.timestamp
+    });
   });
+}
+
+function getGoogleScriptUrl() {
+  const savedUrl = localStorage.getItem(DB_KEYS.GOOGLE_SCRIPT_URL);
+  if (savedUrl && LEGACY_GOOGLE_SCRIPT_URLS.includes(savedUrl)) {
+    localStorage.setItem(DB_KEYS.GOOGLE_SCRIPT_URL, DEFAULT_GOOGLE_SCRIPT_URL);
+    return DEFAULT_GOOGLE_SCRIPT_URL;
+  }
+  return savedUrl || DEFAULT_GOOGLE_SCRIPT_URL;
+}
+
+function saveQuickQueryResponse(response) {
+  localStorage.setItem(DB_KEYS.LAST_QUICK_QUERY_RESPONSE, JSON.stringify(response));
+  renderQuickQueryResponse();
+}
+
+function renderQuickQueryResponse() {
+  const container = document.getElementById('quickQueryResponse');
+  if (!container) return;
+
+  const savedResponse = localStorage.getItem(DB_KEYS.LAST_QUICK_QUERY_RESPONSE);
+  if (!savedResponse) {
+    container.innerHTML = `
+      <div class="response-badge"><i class="fas fa-clock"></i> Waiting for first submission</div>
+      <div class="helper-text">Submit a trainer quick query to see the response received here.</div>
+    `;
+    return;
+  }
+
+  const response = JSON.parse(savedResponse);
+  const syncOkay = response.cloudStatus === 'success';
+
+  container.innerHTML = `
+    <div class="response-badge" style="background:${syncOkay ? '#dcfce7' : '#fee2e2'}; color:${syncOkay ? '#166534' : '#991b1b'};">
+      <i class="fas ${syncOkay ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i>
+      ${syncOkay ? 'Response received successfully' : 'Response received with sync issue'}
+    </div>
+    <div class="response-grid">
+      <div class="response-item">
+        <span>Ticket ID</span>
+        <strong>${escapeHtml(response.ticketId || '-')}</strong>
+      </div>
+      <div class="response-item">
+        <span>Submitted At</span>
+        <strong>${response.submittedAt ? new Date(response.submittedAt).toLocaleString() : '-'}</strong>
+      </div>
+      <div class="response-item">
+        <span>Assigned Agent</span>
+        <strong>${escapeHtml(response.assignedAgentName || 'No active agent')}</strong>
+      </div>
+      <div class="response-item">
+        <span>Assigned Email</span>
+        <strong>${escapeHtml(response.assignedTrainer || 'Unassigned')}</strong>
+      </div>
+      <div class="response-item">
+        <span>Product / Priority</span>
+        <strong>${escapeHtml(response.product || '-')} / ${escapeHtml(response.priority || '-')}</strong>
+      </div>
+      <div class="response-item">
+        <span>Language / Mobile</span>
+        <strong>${escapeHtml(response.language || '-')} / ${escapeHtml(response.mobileNumber || '-')}</strong>
+      </div>
+    </div>
+    <div class="response-item">
+      <span>Query</span>
+      <strong>${escapeHtml(response.queryDescription || '-')}</strong>
+    </div>
+    <div class="response-item">
+      <span>Google Sheets Response</span>
+      <strong>${escapeHtml(response.cloudMessage || 'No response message')}</strong>
+    </div>
+    <div class="response-item">
+      <span>Email Response</span>
+      <strong>${escapeHtml(response.emailMessage || 'No email response captured')}</strong>
+    </div>
+  `;
+}
+
+function showCloudSyncStatus(message, type = 'success') {
+  const statusDiv = document.getElementById('cloudSyncStatus');
+  if (!statusDiv) return;
+
+  statusDiv.style.display = 'block';
+  statusDiv.style.background = type === 'error' ? '#fee2e2' : '#dbeafe';
+  statusDiv.style.borderLeft = type === 'error' ? '4px solid #ef4444' : '4px solid #3b82f6';
+  statusDiv.style.color = type === 'error' ? '#991b1b' : '#1d4ed8';
+  statusDiv.innerHTML = `${type === 'error' ? '<i class="fas fa-exclamation-circle"></i>' : '<i class="fas fa-cloud-check"></i>'} ${escapeHtml(message)}`;
+}
+
+function updateCloudSyncUI() {
+  const input = document.getElementById('googleScriptUrl');
+  const syncButton = document.getElementById('googleSyncBtn');
+  const scriptUrl = getGoogleScriptUrl();
+
+  if (input) {
+    input.value = scriptUrl;
+  }
+
+  if (syncButton) {
+    syncButton.style.display = scriptUrl ? 'inline-flex' : 'none';
+  }
+
+  if (scriptUrl) {
+    showCloudSyncStatus('Google Sheets cloud sync is configured: ' + scriptUrl, 'success');
+  }
+}
+
+function setupGoogleSheetsConfigForm() {
+  const form = document.getElementById('googleSheetsConfigForm');
+  if (!form) return;
+
+  const input = document.getElementById('googleScriptUrl');
+  if (input) {
+    input.value = getGoogleScriptUrl();
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const scriptUrl = input ? input.value.trim() : '';
+    if (!scriptUrl) {
+      showCloudSyncStatus('Enter your deployed Google Apps Script web app URL.', 'error');
+      return;
+    }
+
+    localStorage.setItem(DB_KEYS.GOOGLE_SCRIPT_URL, scriptUrl);
+    updateCloudSyncUI();
+    showToast('Cloud sync enabled', 'success');
+  });
+}
+
+function buildGoogleSheetPayload(ticket) {
+  return {
+    ticketId: ticket.id,
+    mobile: ticket.mobileNumber,
+    product: ticket.product,
+    language: ticket.language || '',
+    query: ticket.queryDescription,
+    priority: ticket.priority,
+    status: ticket.status || 'Open',
+    assignedTo: ticket.assignedTrainer || 'Unassigned',
+    assignedAgentName: ticket.assignedAgentName || '',
+    sendAssignmentEmail: Boolean(ticket.assignedTrainer),
+    timestamp: ticket.timestamp || new Date().toISOString()
+  };
+}
+
+async function submitTicketToGoogleSheet(ticket) {
+  const scriptUrl = getGoogleScriptUrl();
+  if (!scriptUrl) {
+    return { success: false, message: 'Cloud sync URL is not configured.' };
+  }
+
+  try {
+    const response = await fetch(scriptUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(buildGoogleSheetPayload(ticket))
+    });
+
+    if (!response.ok) {
+      return { success: false, message: `Cloud sync failed with status ${response.status}.` };
+    }
+
+    const result = await response.json();
+    if (result.status !== 'success') {
+      return { success: false, message: result.message || 'Cloud sync failed.' };
+    }
+
+    const messageParts = ['Ticket synced to Google Sheets.'];
+    if (typeof result.emailStatus === 'string') {
+      messageParts.push(`Email: ${result.emailStatus}`);
+    }
+    if (result.emailMessage) {
+      messageParts.push(result.emailMessage);
+    }
+
+    return { success: true, message: messageParts.join(' ') };
+  } catch (error) {
+    console.error('Cloud sync error:', error);
+    return { success: false, message: 'Cloud sync failed. Check the Apps Script URL and deployment access.' };
+  }
+}
+
+async function syncAllTicketsToGoogleSheet() {
+  const scriptUrl = getGoogleScriptUrl();
+  if (!scriptUrl) {
+    showCloudSyncStatus('Set the Google Apps Script URL first.', 'error');
+    return;
+  }
+
+  const savedTickets = localStorage.getItem(DB_KEYS.TICKETS);
+  const tickets = savedTickets ? JSON.parse(savedTickets) : [];
+
+  if (tickets.length === 0) {
+    showCloudSyncStatus('There are no local tickets to sync.', 'error');
+    return;
+  }
+
+  let syncedCount = 0;
+  for (const ticket of tickets) {
+    const result = await submitTicketToGoogleSheet(ticket);
+    if (result.success) {
+      syncedCount++;
+    }
+  }
+
+  if (syncedCount === tickets.length) {
+    showCloudSyncStatus(`Synced ${syncedCount} tickets to Google Sheets.`, 'success');
+    showToast('All tickets synced to cloud', 'success');
+    return;
+  }
+
+  showCloudSyncStatus(`Synced ${syncedCount} of ${tickets.length} tickets.`, 'error');
 }
 
 // ===== Setup Agent Management Form =====
@@ -518,8 +791,9 @@ function setupAgentManagementForm() {
 
     const name = document.getElementById('agentName').value.trim();
     const email = document.getElementById('agentEmail').value.trim();
+    const language = document.getElementById('agentLanguage').value.trim();
 
-    if (addNewAgent(name, email)) {
+    if (addNewAgent(name, email, language)) {
       form.reset();
     }
   });
@@ -809,6 +1083,55 @@ function claimTicket(ticketId) {
 }
 
 // ===== Send Email =====
+function sendAssignmentEmail(agent, ticket) {
+  if (!agent || !agent.email) {
+    return Promise.resolve({ success: false, message: 'Assigned agent email is missing.' });
+  }
+
+  const config = getEmailJSConfig();
+
+  if (!config.publicKey || !config.serviceId || !config.templateId) {
+    console.log('Auto-assignment email skipped: EmailJS not configured');
+    return Promise.resolve({ success: false, message: 'EmailJS not configured.' });
+  }
+
+  if (typeof emailjs === 'undefined') {
+    console.log('Auto-assignment email skipped: EmailJS library not loaded');
+    return Promise.resolve({ success: false, message: 'EmailJS library not loaded.' });
+  }
+
+  try {
+    emailjs.init(config.publicKey);
+
+    const templateParams = {
+      to_email: agent.email,
+      ticket_id: ticket.id,
+      mobile_number: ticket.mobileNumber,
+      product: ticket.product,
+      query_description: ticket.queryDescription,
+      priority: ticket.priority,
+      status: ticket.status || 'Assigned',
+      assigned_date: new Date().toLocaleString(),
+      agent_name: agent.name || '',
+      language: ticket.language || ''
+    };
+
+    return emailjs.send(config.serviceId, config.templateId, templateParams)
+      .then(() => {
+        console.log('Auto-assignment email sent to', agent.email);
+        return { success: true, message: 'Assignment email sent.' };
+      })
+      .catch((error) => {
+        console.error('Auto-assignment email failed:', error);
+        const message = error && (error.text || error.message || error.status) ? String(error.text || error.message || error.status) : 'Unknown email error';
+        return { success: false, message: message };
+      });
+  } catch (error) {
+    console.error('Auto-assignment email init failed:', error);
+    return Promise.resolve({ success: false, message: error.message || 'EmailJS initialization failed.' });
+  }
+}
+
 function sendEmail(email, ticket) {
   const emailContent = generateEmailContent(email, ticket);
   showEmailPreviewModal(emailContent, email, ticket);
@@ -1010,10 +1333,6 @@ function setupEmailJSConfigForm() {
   document.getElementById('serviceId').value = config.serviceId || '';
   document.getElementById('templateId').value = config.templateId || '';
 
-  if (config.publicKey && config.serviceId && config.templateId) {
-    form.style.display = 'none';
-  }
-
   form.addEventListener('submit', (e) => {
     e.preventDefault();
 
@@ -1043,7 +1362,6 @@ function setupEmailJSConfigForm() {
       statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> ✅ EmailJS configured permanently!';
     }
 
-    form.style.display = 'none';
     showToast('✅ EmailJS configured permanently!', 'success');
 
     setTimeout(() => {
@@ -1064,7 +1382,11 @@ function getEmailJSConfig() {
     return JSON.parse(backup);
   }
 
-  return { publicKey: '', serviceId: '', templateId: '' };
+  return {
+    publicKey: '',
+    serviceId: '',
+    templateId: ''
+  };
 }
 
 function checkEmailJSConfiguration() {
@@ -1082,34 +1404,53 @@ function checkEmailJSConfiguration() {
 
 // ===== Helper Functions =====
 function switchTab(tabId) {
+  console.log('📌 switchTab called with:', tabId);
+  
   const tabButtons = document.querySelectorAll('.tab-btn');
   const tabContents = document.querySelectorAll('.tab-content');
   
+  console.log('🚀 Found buttons:', tabButtons.length, 'contents:', tabContents.length);
+  
   // Remove active class from all buttons and contents
-  tabButtons.forEach(btn => btn.classList.remove('active'));
-  tabContents.forEach(content => content.classList.remove('active'));
+  tabButtons.forEach(btn => {
+    btn.classList.remove('active');
+    console.log('🔘 Button removed active:', btn.getAttribute('data-tab'));
+  });
+  
+  tabContents.forEach(content => {
+    content.classList.remove('active');
+    content.style.display = 'none';
+    console.log('📄 Content removed active:', content.id);
+  });
   
   // Add active class to selected button
   const selectedButton = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
   if (selectedButton) {
     selectedButton.classList.add('active');
+    console.log('✅ Button added active:', selectedButton.getAttribute('data-tab'));
+  } else {
+    console.error('❌ Button not found for tab:', tabId);
   }
   
   // Show selected tab content
   const selectedContent = document.getElementById(tabId);
   if (selectedContent) {
     selectedContent.classList.add('active');
+    selectedContent.style.display = 'block';
+    console.log('✅ Content added active:', selectedContent.id);
+  } else {
+    console.error('❌ Content not found for tab:', tabId);
   }
+  
+  // Always update agents list for debugging
+  console.log('🔄 Calling updateAvailableAgentsList');
+  updateAvailableAgentsList();
+  console.log('🔄 Calling updateAssignmentHistory');
+  updateAssignmentHistory();
   
   // Update archive list when switching to archive tab
   if (tabId === 'archive') {
     updateArchiveList();
-  }
-  
-  // Update agent list when switching to agents tab
-  if (tabId === 'agents') {
-    updateAvailableAgentsList();
-    updateAssignmentHistory();
   }
   
   // Update reports when switching to reports tab
@@ -1201,7 +1542,14 @@ function escapeHtml(text) {
 
 // Update the available agents list in the UI
 function updateAvailableAgentsList() {
+  console.log('🚨 updateAvailableAgentsList is being called!');
+  console.log('availableAgents variable:', availableAgents);
+  console.log('LocalStorage agents:', localStorage.getItem('selfTicket_available_agents'));
+  console.log('📋 updateAvailableAgentsList called');
+  console.log('availableAgents:', availableAgents);
+  console.log('localStorage:', localStorage.getItem('selfTicket_available_agents'));
   const container = document.getElementById('availableAgentsList');
+  console.log('container found:', !!container);
   if (!container) return;
 
   const activeAgents = availableAgents.filter(a => a.status === 'Active');
@@ -1216,6 +1564,7 @@ function updateAvailableAgentsList() {
           <div>
             <div style="font-weight: 600;">${escapeHtml(agent.name)}</div>
             <div style="font-size: 0.85rem; color: #6b7280;">${escapeHtml(agent.email)}</div>
+            <div style="font-size: 0.8rem; color: #6b7280;">Language: ${escapeHtml(agent.language || 'Any')}</div>
             <div style="font-size: 0.8rem; color: #9ca3af;">Assigned: ${agent.assignedCount || 0} tickets</div>
           </div>
           <div style="display: flex; gap: 0.5rem;">
@@ -1237,6 +1586,7 @@ function updateAvailableAgentsList() {
           <div>
             <div style="font-weight: 600; color: #6b7280;">${escapeHtml(agent.name)}</div>
             <div style="font-size: 0.85rem; color: #9ca3af;">${escapeHtml(agent.email)}</div>
+            <div style="font-size: 0.8rem; color: #9ca3af;">Language: ${escapeHtml(agent.language || 'Any')}</div>
           </div>
           <button onclick="toggleAgentStatus(${agent.id})" style="padding: 0.4rem 0.8rem; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
             <i class="fas fa-play"></i> Reactivate
@@ -1259,6 +1609,7 @@ function updateAvailableAgentsList() {
         <div style="font-size: 0.9rem; color: #374151;">
           <strong>Next Agent:</strong> ${nextAgent ? escapeHtml(nextAgent.name) + ' (' + escapeHtml(nextAgent.email) + ')' : 'None available'}
         </div>
+        ${nextAgent ? `<div style="font-size: 0.85rem; color: #6b7280; margin-top: 0.4rem;"><strong>Languages:</strong> ${escapeHtml(nextAgent.language || 'Any')}</div>` : ''}
         <div style="font-size: 0.85rem; color: #6b7280; margin-top: 0.5rem;">
           <strong>Rotation Index:</strong> ${rotationIndex} | <strong>Total Active:</strong> ${activeAgents.length}
         </div>
@@ -1288,8 +1639,8 @@ function removeAgentFromList(agentId) {
 }
 
 // Add new agent via form
-function addNewAgent(name, email) {
-  if (!name || !email) {
+function addNewAgent(name, email, language) {
+  if (!name || !email || !language) {
     showToast('❌ Please provide both name and email', 'error');
     return false;
   }
@@ -1307,7 +1658,7 @@ function addNewAgent(name, email) {
     return false;
   }
 
-  addAgent(name, email);
+  addAgent(name, email, language);
   updateAvailableAgentsList();
   showToast('✅ Agent added: ' + email, 'success');
   return true;
@@ -1352,7 +1703,8 @@ function updateAssignmentHistory() {
       </div>
       <div style="margin-top: 0.5rem; font-size: 0.85rem; color: #374151;">
         <strong>Priority:</strong> ${record.ticketDetails.priority} | 
-        <strong>Product:</strong> ${escapeHtml(record.ticketDetails.product)}
+        <strong>Product:</strong> ${escapeHtml(record.ticketDetails.product)} |
+        <strong>Agent Language:</strong> ${escapeHtml(record.agentLanguage || 'Any')}
       </div>
     </div>
   `).join('');
@@ -1449,6 +1801,7 @@ globalThis.autoAssignTicket = autoAssignTicket;
 globalThis.getNextAgent = getNextAgent;
 globalThis.getAgentStats = getAgentStats;
 globalThis.getAssignmentHistory = getAssignmentHistory;
+globalThis.syncAllTicketsToGoogleSheet = syncAllTicketsToGoogleSheet;
 
 // Export assignment history to CSV
 function exportAssignmentHistory() {

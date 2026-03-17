@@ -439,8 +439,11 @@
       TICKET_COUNTER: 'selfTicket_counter',
       ASSIGNMENT_HISTORY: 'selfTicket_assignment_history',
       AGENT_ROTATION: 'selfTicket_agent_rotation',
-      AVAILABLE_AGENTS: 'selfTicket_available_agents'
+      AVAILABLE_AGENTS: 'selfTicket_available_agents',
+      GOOGLE_SCRIPT_URL: 'selfTicket_google_script_url'
     };
+
+    const DEFAULT_GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbDf1n2vQ57ybTAt2QAvTJFHhr4XCmT0DTejbDYKBvrmt8Tz9ZNYAsjnIY6AMGB6A/exec';
 
     // Initialize data stores
     function initializeData() {
@@ -750,7 +753,52 @@ Self-Ticket Support System
       return { valid: true, message: 'Valid', cleanedNumber: cleaned };
     }
 
-    form.addEventListener('submit', (e) => {
+    function getGoogleScriptUrl() {
+      return DEFAULT_GOOGLE_SCRIPT_URL;
+    }
+
+    async function submitTicketToGoogleSheet(ticket) {
+      try {
+        const response = await fetch(getGoogleScriptUrl(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify({
+            ticketId: ticket.id,
+            mobile: ticket.mobileNumber,
+            product: ticket.product,
+            language: ticket.language || '',
+            query: ticket.queryDescription,
+            priority: ticket.priority,
+            status: ticket.status || 'Open',
+            assignedTo: ticket.assignedTrainer || 'Unassigned',
+            assignedAgentName: ticket.assignedAgentName || '',
+            sendAssignmentEmail: Boolean(ticket.assignedTrainer),
+            timestamp: ticket.timestamp || new Date().toISOString()
+          })
+        });
+
+        if (!response.ok) {
+          return {
+            status: 'error',
+            message: `HTTP ${response.status}`
+          };
+        }
+
+        const result = await response.json();
+        console.log('Google Sheets response:', result);
+        return result;
+      } catch (error) {
+        console.error('Google Sheets sync failed:', error);
+        return {
+          status: 'error',
+          message: error.message || 'Network error'
+        };
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       
       const mobile = document.getElementById('mobile').value;
@@ -793,14 +841,18 @@ Self-Ticket Support System
       
       if (assignedAgent) {
         showToast('✅ Ticket assigned to ' + assignedAgent.email);
-        // Send email notification to the assigned agent
-        sendAssignmentEmail(assignedAgent, newTicket);
       } else {
         showToast('⚠️ Ticket submitted - no agents available');
       }
       
       tickets.push(newTicket);
       saveTickets(tickets);
+
+      const sheetResult = await submitTicketToGoogleSheet(newTicket);
+      if (!sheetResult || sheetResult.status !== 'success') {
+        console.error('Sheet sync result:', sheetResult);
+        showToast('⚠ Sheet sync failed: ' + ((sheetResult && sheetResult.message) || 'Unknown error'));
+      }
       
       // Show success
       form.style.display = 'none';

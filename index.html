@@ -1,387 +1,478 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Self-Ticket Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Trainer Quick Query Portal</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <script defer src="app.js"></script>
+  <style>
+    :root {
+      --bg: #eef4fb;
+      --panel: #ffffff;
+      --panel-soft: #f8fbff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #dbe4f0;
+      --brand: #175cd3;
+      --brand-dark: #1447a6;
+      --shadow: 0 18px 40px rgba(23, 92, 211, 0.08);
+    }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at top right, rgba(23, 92, 211, 0.14), transparent 22%), linear-gradient(180deg, #f7fbff 0%, #eef4fb 100%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .shell { max-width: 1440px; margin: 0 auto; }
+    .hero {
+      background: linear-gradient(135deg, #0f3d91 0%, #175cd3 55%, #3b82f6 100%);
+      color: #fff;
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+    .hero h1 { font-size: 2rem; margin-bottom: 8px; }
+    .hero p { color: rgba(255, 255, 255, 0.88); max-width: 760px; line-height: 1.5; }
+    .hero-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; margin-top: 20px; }
+    .hero-stat {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 18px;
+      padding: 18px;
+    }
+    .hero-stat strong { display: block; font-size: 1.5rem; margin-top: 6px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(219, 228, 240, 0.8);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .panel-header { padding: 18px 22px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fff, #f9fbff); }
+    .panel-header h2, .panel-header h3 { font-size: 1.05rem; margin: 0; }
+    .panel-header p { margin-top: 6px; color: var(--muted); font-size: 0.92rem; }
+    .panel-body { padding: 22px; }
+    .nav-wrap { margin-bottom: 20px; }
+    .nav-tabs {
+      background: #fff;
+      padding: 10px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+    .nav-tabs .tab-btn,
+    #ticketQueue button,
+    #availableAgentsList button,
+    #archiveList button {
+      width: auto;
+    }
+    .dashboard-grid { display: grid; grid-template-columns: 420px 1fr; gap: 20px; }
+    .stack { display: grid; gap: 20px; }
+    .form-grid { display: grid; gap: 16px; }
+    .field label { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; font-weight: 600; margin-bottom: 8px; }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      border: 1px solid #cfd9e6;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      background: var(--panel-soft);
+    }
+    .field textarea { min-height: 120px; resize: vertical; }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none;
+      border-color: var(--brand);
+      box-shadow: 0 0 0 4px rgba(23, 92, 211, 0.12);
+      background: #fff;
+    }
+    .priority-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .priority-card input { display: none; }
+    .priority-card label {
+      display: block;
+      text-align: center;
+      padding: 14px 10px;
+      border: 1px solid #cfd9e6;
+      border-radius: 12px;
+      background: var(--panel-soft);
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+    .priority-card input:checked + label {
+      border-color: var(--brand);
+      background: rgba(23, 92, 211, 0.08);
+      color: var(--brand);
+      font-weight: 700;
+    }
+    .primary-btn, .secondary-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+    }
+    .primary-btn { background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%); color: #fff; }
+    .secondary-btn { background: #e8f0fb; color: var(--brand); }
+    .response-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fbfdff 0%, #f3f8ff 100%);
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+    .response-badge {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      background: #e0ecff;
+      color: var(--brand);
+    }
+    .response-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .response-item { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+    .response-item span { display: block; color: var(--muted); font-size: 0.8rem; margin-bottom: 6px; }
+    .queue-toolbar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .queue-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
+    .list-empty {
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      background: #f8fbff;
+      border: 1px dashed #c6d4e5;
+      border-radius: 16px;
+    }
+    .agents-layout, .reports-layout, .settings-layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
+    .subpanel { background: #f9fbff; border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+    .subpanel h3 { margin-bottom: 14px; font-size: 1rem; }
+    .helper-text { color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+    #cloudSyncStatus, #configStatus { display: none; border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
+    .soft-scroll { max-height: 480px; overflow: auto; }
+    body > button[style*="position: fixed"][style*="background: red"] { display: none !important; }
+    @media (max-width: 1100px) {
+      .dashboard-grid, .agents-layout, .reports-layout, .settings-layout, .hero-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      body { padding: 14px; }
+      .queue-toolbar, .response-grid, .priority-grid { grid-template-columns: 1fr; }
+      .queue-actions { flex-direction: column; align-items: stretch; }
+    }
+  </style>
 </head>
-
 <body>
-  <div class="app-container">
-    <header class="app-header">
-      <div class="logo">
-        <i class="fas fa-ticket-alt"></i>
-        <span>Self-Ticket</span>
+  <div class="shell">
+    <section class="hero">
+      <h1>Trainer Quick Query Portal</h1>
+      <p>Submit trainer queries, auto-assign them to available agents in round-robin order, and track the response received from the Google Sheets sync endpoint in one place.</p>
+      <div class="hero-grid">
+        <div class="hero-stat">
+          <div>Open Queue</div>
+          <strong id="queueBadge">0</strong>
+          <small>Active tickets waiting in the dashboard queue.</small>
+        </div>
+        <div class="hero-stat">
+          <div>Assignment Mode</div>
+          <strong>Auto Claim / Assign</strong>
+          <small>Uses the available agent list from the Agents tab.</small>
+        </div>
       </div>
+    </section>
+
+    <div class="nav-wrap">
       <nav class="nav-tabs">
-        <button class="tab-btn active" data-tab="queue">
-          <i class="fas fa-list-alt"></i> Queue
-          <span class="badge" id="queueBadge">0</span>
-        </button>
-        <button class="tab-btn" data-tab="archive">
-          <i class="fas fa-archive"></i> Archive
-        </button>
-        <button class="tab-btn" data-tab="agents">
-          <i class="fas fa-users-cog"></i> Agents
-        </button>
-        <button class="tab-btn" data-tab="reports">
-          <i class="fas fa-chart-bar"></i> Reports
-        </button>
-        <button class="tab-btn" data-tab="settings">
-          <i class="fas fa-cog"></i> Settings
-        </button>
+        <button class="tab-btn active" data-tab="queue"><i class="fas fa-inbox"></i> Queue</button>
+        <button class="tab-btn" data-tab="archive"><i class="fas fa-box-archive"></i> Archive</button>
+        <button class="tab-btn" data-tab="agents"><i class="fas fa-users"></i> Agents</button>
+        <button class="tab-btn" data-tab="reports"><i class="fas fa-chart-column"></i> Reports</button>
+        <button class="tab-btn" data-tab="settings"><i class="fas fa-gear"></i> Settings</button>
       </nav>
-    </header>
+    </div>
 
-    <main class="main-content">
-      <!-- Queue / Dashboard View -->
-      <section id="queue" class="tab-content">
-        <div class="queue-header">
-            <h2><i class="fas fa-tasks"></i> Ticket Queue</h2>
-            <div style="display: flex; gap: 0.5rem;">
-                <button onclick="manualRefreshQueue()"
-                  style="padding: 0.5rem 1rem; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-                  <i class="fas fa-sync"></i> Refresh
-                </button>
-                <button onclick="syncAllTicketsToGoogleSheet()"
-                  id="googleSyncBtn"
-                  style="padding: 0.5rem 1rem; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: none; align-items: center; gap: 0.5rem;"
-                  title="Sync all tickets to Google Sheets">
-                  <i class="fas fa-cloud-upload-alt"></i> Sync to Cloud
-                </button>
+    <section id="queue" class="tab-content active">
+      <div class="dashboard-grid">
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Trainer Quick Query</h2>
+              <p>Raise a ticket and auto-assign it to the next active agent.</p>
             </div>
-          <div class="queue-filters">
-            <select id="urgencyFilter" onchange="filterTickets()">
-              <option value="all">All Urgencies</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-            </select>
-            <select id="categoryFilter" onchange="filterTickets()">
-              <option value="all">All Categories</option>
-              <option value="Technical">Technical</option>
-              <option value="Content">Content</option>
-              <option value="Schedule">Schedule</option>
-            </select>
-            <select id="languageFilter" onchange="filterTickets()">
-              <option value="all">All Languages</option>
-            </select>
+            <div class="panel-body">
+              <form id="quickTicketForm" class="form-grid">
+                <div class="field">
+                  <label for="mobile"><i class="fas fa-mobile-screen"></i> Mobile Number</label>
+                  <input type="tel" id="mobile" placeholder="Enter 10-digit mobile number" maxlength="10" required>
+                </div>
+                <div class="field">
+                  <label for="product"><i class="fas fa-layer-group"></i> Product</label>
+                  <select id="product" required>
+                    <option value="">Select product</option>
+                    <option value="POS">POS</option>
+                    <option value="Payroll">Payroll</option>
+                    <option value="Task">Task</option>
+                    <option value="Reservation">Reservation</option>
+                    <option value="Retail">Retail</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="language"><i class="fas fa-language"></i> Language</label>
+                  <input type="text" id="language" placeholder="English, Hindi, Gujarati..." required>
+                </div>
+                <div class="field">
+                  <label for="queries"><i class="fas fa-circle-question"></i> Query</label>
+                  <textarea id="queries" placeholder="Describe the trainer issue or request" required></textarea>
+                </div>
+                <div class="field">
+                  <label><i class="fas fa-flag"></i> Priority</label>
+                  <div class="priority-grid">
+                    <div class="priority-card">
+                      <input type="radio" name="priority" id="priorityLow" value="Low">
+                      <label for="priorityLow">Low</label>
+                    </div>
+                    <div class="priority-card">
+                      <input type="radio" name="priority" id="priorityMedium" value="Medium" checked>
+                      <label for="priorityMedium">Medium</label>
+                    </div>
+                    <div class="priority-card">
+                      <input type="radio" name="priority" id="priorityHigh" value="High">
+                      <label for="priorityHigh">High</label>
+                    </div>
+                  </div>
+                </div>
+                <button type="submit" class="primary-btn"><i class="fas fa-paper-plane"></i> Submit Quick Query</button>
+              </form>
+            </div>
           </div>
-        </div>
-        <div id="ticketQueue" class="ticket-grid">
-          <!-- Tickets will be rendered here -->
-        </div>
-        <div id="emptyQueue" class="empty-state">
-          <i class="fas fa-inbox"></i>
-          <p>No open tickets in queue</p>
-        </div>
-      </section>
 
-      <!-- Archive Tab -->
-      <section id="archive" class="tab-content">
-        <h2><i class="fas fa-archive"></i> Resolved Tickets</h2>
-        <div id="archiveList" class="archive-list">
-          <!-- Resolved tickets will be rendered here -->
-        </div>
-        <div id="emptyArchive" class="empty-state">
-          <i class="fas fa-archive"></i>
-          <p>No archived tickets</p>
-        </div>
-      </section>
-
-      <!-- Agents/Round-Robin Management Tab -->
-      <section id="agents" class="tab-content">
-        <h2><i class="fas fa-users-cog"></i> Agent Management</h2>
-        <p style="color: #6b7280; margin-bottom: 1.5rem;">Manage team members for automatic round-robin ticket assignment</p>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-          <!-- Left: Agent List -->
-          <div style="background: white; padding: 1.5rem; border-radius: 10px; border: 1px solid #e5e7eb;">
-            <h3 style="margin-bottom: 1rem; color: #374151;"><i class="fas fa-user-friends"></i> Available Agents</h3>
-            
-            <!-- Rotation Status -->
-            <div id="rotationInfo" style="margin-bottom: 1rem;"></div>
-            
-            <!-- Add Agent Form -->
-            <form id="addAgentForm" style="margin-bottom: 1.5rem; padding: 1rem; background: #f9fafb; border-radius: 6px;">
-              <div style="margin-bottom: 0.75rem;">
-                <label for="agentName" style="display: block; margin-bottom: 0.25rem; font-weight: 600; font-size: 0.9rem; color: #374151;">Name</label>
-                <input type="text" id="agentName" placeholder="John Doe" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.9rem;">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Response Received</h3>
+              <p>Latest submission, auto-claim result, and Google Sheets sync response.</p>
+            </div>
+            <div class="panel-body">
+              <div id="quickQueryResponse" class="response-card">
+                <div class="response-badge"><i class="fas fa-clock"></i> Waiting for first submission</div>
+                <div class="helper-text">Submit a trainer quick query to see the response received here.</div>
               </div>
-              <div style="margin-bottom: 0.75rem;">
-                <label for="agentEmail" style="display: block; margin-bottom: 0.25rem; font-weight: 600; font-size: 0.9rem; color: #374151;">Email</label>
-                <input type="email" id="agentEmail" placeholder="john@company.com" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.9rem;">
-              </div>
-              <button type="submit" style="width: 100%; padding: 0.5rem; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
-                <i class="fas fa-plus"></i> Add Agent
-              </button>
-            </form>
-            
-            <!-- Agent List -->
-            <div id="availableAgentsList" style="max-height: 400px; overflow-y: auto;"></div>
-          </div>
-          
-          <!-- Right: Assignment History -->
-          <div style="background: white; padding: 1.5rem; border-radius: 10px; border: 1px solid #e5e7eb;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-              <h3 style="color: #374151;"><i class="fas fa-history"></i> Recent Assignments</h3>
-              <button onclick="resetRoundRobinRotation()" style="padding: 0.4rem 0.8rem; background: #4f46e5; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
-                <i class="fas fa-sync"></i> Reset Rotation
-              </button>
             </div>
-            <div id="assignmentHistoryList" style="max-height: 500px; overflow-y: auto;"></div>
           </div>
         </div>
-      </section>
 
-      <!-- Reports Tab -->
-      <section id="reports" class="tab-content">
-        <h2><i class="fas fa-chart-bar"></i> Assignment Reports</h2>
-        <p style="color: #6b7280; margin-bottom: 1.5rem;">View ticket assignment statistics and distribution</p>
-        
-        <div style="background: white; padding: 1.5rem; border-radius: 10px; border: 1px solid #e5e7eb;">
-          <h3 style="margin-bottom: 1rem; color: #374151;"><i class="fas fa-table"></i> Agent Statistics</h3>
-          <div id="assignmentStats"></div>
-        </div>
-        
-        <div style="margin-top: 1.5rem; background: white; padding: 1.5rem; border-radius: 10px; border: 1px solid #e5e7eb;">
-          <h3 style="margin-bottom: 1rem; color: #374151;"><i class="fas fa-download"></i> Export Data</h3>
-          <p style="color: #6b7280; margin-bottom: 1rem;">Download assignment history for external reporting</p>
-          <button onclick="exportAssignmentHistory()" style="padding: 0.75rem 1.5rem; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
-            <i class="fas fa-file-export"></i> Export to CSV
-          </button>
-        </div>
-      </section>
-
-      <!-- Settings Tab -->
-      <section id="settings" class="tab-content">
-        <h2><i class="fas fa-cog"></i> Configuration</h2>
-        <div
-          style="max-width: 600px; background: white; padding: 2rem; border-radius: 10px; border: 1px solid #e5e7eb;">
-          
-          <!-- Google Sheets Sync Section -->
-          <div
-            style="background: #eff6ff; padding: 1.5rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #3b82f6;">
-            <h3 style="margin: 0 0 0.5rem 0; color: #3b82f6;">
-              <i class="fas fa-cloud"></i> Google Sheets Cloud Sync
-            </h3>
-            <p style="color: #6b7280; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
-              Enable cloud storage to sync tickets across devices using Google Sheets
-            </p>
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Open Ticket Queue</h2>
+            <p>Claims can still be completed manually from the queue if required.</p>
           </div>
-
-          <form id="googleSheetsConfigForm" style="margin-bottom: 2rem;">
-            <div style="margin-bottom: 1rem;">
-              <label for="googleScriptUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
-                Google Apps Script URL
-              </label>
-              <input type="url" id="googleScriptUrl" placeholder="https://script.google.com/macros/s/..."
-                value="https://script.google.com/macros/s/AKfycbxG6VZG9N6W4L5M0kL4kJ6nH8vT2xY8zQ9kR1sL3mN5pQ7rS9tU0vW2xY4Z6aB8cD0eF/exec"
-                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
-              <p style="margin: 0.5rem 0 0 0; color: #6b7280; font-size: 0.85rem;">
-                Get this from: Google Apps Script deployment → Web app URL
-              </p>
+          <div class="panel-body">
+            <div class="queue-actions">
+              <button class="secondary-btn" type="button" onclick="manualRefreshQueue()"><i class="fas fa-rotate"></i> Refresh Queue</button>
             </div>
-
-            <button type="submit"
-              style="width: 100%; padding: 0.75rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">
-              <i class="fas fa-sync"></i>
-              Enable Cloud Sync
-            </button>
-          </form>
-
-          <div id="cloudSyncStatus" style="margin: 1rem 0; padding: 1rem; border-radius: 6px; display: none;"></div>
-
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 2rem 0;">
-
-          <!-- EmailJS Section -->
-          <div
-            style="background: #f0f4ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; border-left: 4px solid #4f46e5;">
-            <p style="color: #4f46e5; margin: 0; font-weight: 600;">
-              <i class="fas fa-info-circle" style="margin-right: 0.5rem;"></i>
-              AutoEmail Configuration
-            </p>
-            <p style="color: #6b7280; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
-              Enter your EmailJS credentials below to enable automatic email sending
-            </p>
-          </div>
-
-          <form id="emailjsConfigForm">
-            <div style="margin-bottom: 1rem;">
-              <label for="publicKey" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
-                EmailJS Public Key
-              </label>
-              <input type="text" id="publicKey" placeholder="pk_xxxxxxxxxxxxxxx"
-                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
-              <p style="margin: 0.5rem 0 0 0; color: #6b7280; font-size: 0.85rem;">
-                Get this from: EmailJS Dashboard → Account → API Keys
-              </p>
+            <div class="queue-toolbar">
+              <select id="urgencyFilter" onchange="filterTickets()">
+                <option value="all">All Priorities</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+              <select id="categoryFilter" onchange="filterTickets()">
+                <option value="all">All Products</option>
+                <option value="POS">POS</option>
+                <option value="Payroll">Payroll</option>
+                <option value="Task">Task</option>
+                <option value="Reservation">Reservation</option>
+                <option value="Retail">Retail</option>
+              </select>
+              <select id="languageFilter" onchange="filterTickets()">
+                <option value="all">All Languages</option>
+              </select>
+              <button class="secondary-btn" type="button" onclick="filterTickets()"><i class="fas fa-filter"></i> Apply Filters</button>
             </div>
-
-            <div style="margin-bottom: 1rem;">
-              <label for="serviceId" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
-                Service ID
-              </label>
-              <input type="text" id="serviceId" placeholder="service_xxxxxxx"
-                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
-              <p style="margin: 0.5rem 0 0 0; color: #6b7280; font-size: 0.85rem;">
-                Get this from: EmailJS Dashboard → Email Services
-              </p>
-            </div>
-
-            <div style="margin-bottom: 1rem;">
-              <label for="templateId" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
-                Template ID
-              </label>
-              <input type="text" id="templateId" placeholder="template_xxxxxxx"
-                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: monospace; font-size: 0.9rem;">
-              <p style="margin: 0.5rem 0 0 0; color: #6b7280; font-size: 0.85rem;">
-                Get this from: EmailJS Dashboard → Email Templates
-              </p>
-            </div>
-
-            <button type="submit"
-              style="width: 100%; padding: 0.75rem; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">
-              <i class="fas fa-save" style="margin-right: 0.5rem;"></i>
-              Save EmailJS Configuration
-            </button>
-          </form>
-
-          <div id="configStatus" style="margin-top: 1rem; padding: 1rem; border-radius: 6px; display: none;"
-            class="config-status">
+            <div id="emptyQueue" class="list-empty">No open tickets in queue.</div>
+            <div id="ticketQueue"></div>
           </div>
-
-          <div
-            style="margin-top: 2rem; padding: 1rem; background: #f9fafb; border-radius: 6px; border-left: 4px solid #10b981;">
-            <h4 style="margin: 0 0 0.5rem 0; color: #374151;">
-              <i class="fas fa-check-circle" style="color: #10b981; margin-right: 0.5rem;"></i>
-              How to Get Your Credentials
-            </h4>
-            <ol style="margin: 0; padding-left: 1.5rem; color: #6b7280; font-size: 0.9rem;">
-              <li style="margin-bottom: 0.5rem;">Sign up free at <strong>emailjs.com</strong></li>
-              <li style="margin-bottom: 0.5rem;">Add your email service (Gmail recommended)</li>
-              <li style="margin-bottom: 0.5rem;">Create an email template</li>
-              <li style="margin-bottom: 0.5rem;">Copy your Public Key, Service ID, and Template ID</li>
-              <li>Paste them above and click Save</li>
-            </ol>
-          </div>
-        </div>
-      </section>
-
-      <!-- Dashboard Builder Tab -->
-      <section id="dashboard-builder" class="tab-content">
-        <h2><i class="fas fa-chart-line"></i> Query Dashboard Builder</h2>
-        <p style="color: #7f8c8d; margin-bottom: 20px;">Create dashboards from SQL queries for your team</p>
-
-        <div class="dashboard-layout">
-          <div class="query-form-panel">
-            <form id="dashboardForm">
-              <div class="form-group">
-                <label for="dashboardName">
-                  <i class="fas fa-heading"></i> Dashboard Name
-                </label>
-                <input type="text" id="dashboardName" placeholder="Sales Overview" required>
-              </div>
-              <div class="form-group">
-                <label for="dashboardQuery">
-                  <i class="fas fa-database"></i> SQL Query
-                </label>
-                <textarea id="dashboardQuery" rows="5" placeholder="SELECT * FROM sales WHERE date > '2024-01-01'"
-                  required></textarea>
-              </div>
-              <div class="form-group">
-                <label for="chartType">
-                  <i class="fas fa-chart-bar"></i> Chart Type
-                </label>
-                <select id="chartType">
-                  <option value="table">Table</option>
-                  <option value="bar">Bar Chart</option>
-                  <option value="line">Line Chart</option>
-                  <option value="pie">Pie Chart</option>
-                </select>
-              </div>
-              <button type="submit" class="submit-btn">
-                <i class="fas fa-plus"></i> Create Dashboard
-              </button>
-            </form>
-          </div>
-
-          <div class="dashboards-panel">
-            <h3><i class="fas fa-th-large"></i> Available Dashboards</h3>
-            <div id="dashboardsContainer" class="dashboards-grid"></div>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <!-- Trainer Management Modal -->
-    <div id="trainerModal" class="modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3><i class="fas fa-users-cog"></i> Manage Trainers</h3>
-          <span class="close-modal">&times;</span>
-        </div>
-        <div class="modal-body">
-          <div id="trainerList" class="trainer-list">
-            <!-- Trainer items will be rendered here -->
-          </div>
-          <form id="trainerForm" class="add-trainer-form">
-            <input type="text" id="trainerName" placeholder="Trainer Name" required>
-            <button type="submit" class="add-btn">
-              <i class="fas fa-plus"></i> Add Trainer
-            </button>
-          </form>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Dashboard View Modal -->
-    <div id="dashboardModal" class="modal">
-      <div class="modal-content" style="max-width: 900px;">
-        <div class="modal-header">
-          <h3 id="modalDashboardTitle"><i class="fas fa-chart-line"></i> Dashboard</h3>
-          <span class="close-modal" onclick="closeDashboardModal()">&times;</span>
+    <section id="archive" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Resolved Tickets</h2>
+          <p>Tickets moved out of the active queue after assignment completion.</p>
         </div>
-        <div class="modal-body">
-          <div id="dashboardQueryDisplay" class="query-display" style="margin-bottom: 20px;"></div>
-          <div id="dashboardChartContainer" style="height: 350px; margin-bottom: 20px;">
-            <canvas id="chartCanvas"></canvas>
-          </div>
-          <div id="dashboardTableContainer"></div>
+        <div class="panel-body">
+          <div id="emptyArchive" class="list-empty">No resolved tickets yet.</div>
+          <div id="archiveList"></div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Notification Toast -->
-    <div id="toast" class="toast">
-      <i class="fas fa-bell"></i>
-      <span id="toastMessage">Notification</span>
-    </div>
+    <section id="agents" class="tab-content">
+      <div class="agents-layout">
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Add Available Agent</h2>
+              <p>Enter Agent Name, Agent Email Address, and Language. This list is used for round-robin auto assignment.</p>
+            </div>
+            <div class="panel-body">
+              <form id="addAgentForm" class="form-grid">
+                <div class="field">
+                  <label for="agentName"><i class="fas fa-user"></i> Agent Name</label>
+                  <input type="text" id="agentName" placeholder="Enter agent name" required>
+                </div>
+                <div class="field">
+                  <label for="agentEmail"><i class="fas fa-envelope"></i> Agent Email</label>
+                  <input type="email" id="agentEmail" placeholder="agent@example.com" required>
+                </div>
+                <div class="field">
+                  <label for="agentLanguage"><i class="fas fa-language"></i> Agent Language</label>
+                  <input type="text" id="agentLanguage" placeholder="English, Hindi, Gujarati" required>
+                </div>
+                <button type="submit" class="primary-btn"><i class="fas fa-user-plus"></i> Add Agent</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Round-Robin Status</h3>
+            </div>
+            <div class="panel-body">
+              <div id="rotationInfo" class="subpanel">
+                <div class="helper-text">No agent rotation data yet.</div>
+              </div>
+              <div style="margin-top: 14px;">
+                <button type="button" class="secondary-btn" onclick="resetRoundRobinRotation()"><i class="fas fa-arrows-rotate"></i> Reset Rotation</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Available Agent List</h2>
+              <p>Active agents participate in auto claim/assign. Inactive agents are skipped.</p>
+            </div>
+            <div class="panel-body soft-scroll">
+              <div id="availableAgentsList" class="helper-text">No agents configured yet.</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Assignment History</h2>
+              <p>Recent auto-assign actions performed by the portal.</p>
+            </div>
+            <div class="panel-body soft-scroll">
+              <div id="assignmentHistoryList" class="helper-text">No assignment history yet.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="reports" class="tab-content">
+      <div class="reports-layout">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Assignment Summary</h2>
+            <p>Download and review agent-wise round-robin distribution.</p>
+          </div>
+          <div class="panel-body">
+            <div class="subpanel">
+              <h3>Export</h3>
+              <p class="helper-text">Use CSV export for daily or weekly assignment reporting.</p>
+              <button type="button" class="primary-btn" onclick="exportAssignmentHistory()"><i class="fas fa-file-arrow-down"></i> Export Assignment History</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Agent Statistics</h2>
+            <p>Breakdown of assigned tickets by priority.</p>
+          </div>
+          <div class="panel-body">
+            <div id="assignmentStats" class="helper-text">No statistics available yet.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="settings" class="tab-content">
+      <div class="settings-layout">
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Google Sheets Sync</h2>
+              <p>Cloud sync response is shown in the quick query response panel after each submit.</p>
+            </div>
+            <div class="panel-body">
+              <form id="googleSheetsConfigForm" class="form-grid">
+                <div class="field">
+                  <label for="googleScriptUrl"><i class="fas fa-link"></i> Apps Script Web App URL</label>
+                  <input type="url" id="googleScriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+                </div>
+                <button type="submit" class="primary-btn"><i class="fas fa-cloud-arrow-up"></i> Save Cloud Sync URL</button>
+                <button id="googleSyncBtn" type="button" class="secondary-btn" onclick="syncAllTicketsToGoogleSheet()"><i class="fas fa-arrows-rotate"></i> Sync All Tickets</button>
+              </form>
+              <div id="cloudSyncStatus"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>EmailJS Configuration</h2>
+              <p>Used for manual and round-robin auto-assignment email notifications. Enter your real EmailJS keys here.</p>
+            </div>
+            <div class="panel-body">
+              <form id="emailjsConfigForm" class="form-grid">
+                <div class="field">
+                  <label for="publicKey"><i class="fas fa-key"></i> Public Key</label>
+                  <input type="text" id="publicKey" placeholder="EmailJS public key">
+                </div>
+                <div class="field">
+                  <label for="serviceId"><i class="fas fa-server"></i> Service ID</label>
+                  <input type="text" id="serviceId" placeholder="EmailJS service ID">
+                </div>
+                <div class="field">
+                  <label for="templateId"><i class="fas fa-file-lines"></i> Template ID</label>
+                  <input type="text" id="templateId" placeholder="EmailJS template ID">
+                </div>
+                <button type="submit" class="primary-btn"><i class="fas fa-floppy-disk"></i> Save EmailJS Settings</button>
+              </form>
+              <div id="configStatus"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Trainer List</h2>
+              <p>Reference list for manual assignment fallback.</p>
+            </div>
+            <div class="panel-body">
+              <div id="trainerList" class="helper-text">No trainer data available.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
-
-  <script src="app.js"></script>
-  <script>
-    // Test if switchTab is available
-    window.addEventListener('DOMContentLoaded', () => {
-      console.log('✅ Page loaded successfully');
-      console.log('🔧 switchTab function exists:', typeof window.switchTab === 'function');
-      console.log('📋 Tab buttons found:', document.querySelectorAll('.tab-btn').length);
-      
-      // Test click on settings
-      const settingsBtn = document.querySelector('.tab-btn[data-tab="settings"]');
-      if (settingsBtn) {
-        console.log('⚙️ Settings button found');
-        settingsBtn.addEventListener('click', () => {
-          console.log('🖱️ Settings button clicked!');
-        });
-      }
-    });
-  </script>
 </body>
-
 </html>
