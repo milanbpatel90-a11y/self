@@ -6,7 +6,7 @@
  * 2. Create a new sheet named "QuickTickets"
  * 3. Add these headers in row 1:
  *    A1: TicketID | B1: Mobile | C1: Product | D1: Language | 
- *    E1: Query | F1: Priority | G1: Status | H1: AssignedTo | I1: CreatedTime
+ *    E1: Query | F1: Priority | G1: Status | H1: AssignedTo | I1: CreatedTime | J1: CreatorEmail
  * 4. Extensions → Apps Script
  * 5. Paste this code
  * 6. Deploy → New Deployment
@@ -31,7 +31,8 @@ function getOrCreateQuickTicketsSheet() {
       "Priority",
       "Status",
       "AssignedTo",
-      "CreatedTime"
+      "CreatedTime",
+      "CreatorEmail"
     ]);
   }
 
@@ -59,6 +60,7 @@ function buildAssignmentEmailBody(data, ticketId) {
     "Priority: " + (data.priority || ""),
     "Status: " + (data.status || "Open"),
     "Created Time: " + (data.timestamp || new Date().toISOString()),
+    "Creator Email: " + (data.creatorEmail || ""),
     "",
     "QUERY",
     "----------------------------------------",
@@ -103,6 +105,12 @@ function sendMailjetAssignmentEmail(data, ticketId) {
             Name: data.assignedAgentName || data.assignedTo
           }
         ],
+        Cc: data.creatorEmail ? [
+          {
+            Email: data.creatorEmail,
+            Name: data.creatorEmail
+          }
+        ] : [],
         Subject: buildAssignmentEmailSubject(ticketId),
         TextPart: buildAssignmentEmailBody(data, ticketId)
       }
@@ -140,6 +148,7 @@ function sendMailAppAssignmentEmail(data, ticketId) {
   try {
     MailApp.sendEmail({
       to: data.assignedTo,
+      cc: data.creatorEmail || "",
       subject: buildAssignmentEmailSubject(ticketId),
       body: buildAssignmentEmailBody(data, ticketId)
     });
@@ -181,7 +190,8 @@ function doPost(e) {
       data.priority || "Medium",
       data.status || "Open",
       data.assignedTo || "Unassigned",
-      data.timestamp || data.createdTime || data.CreatedTime || new Date().toISOString()
+      data.timestamp || data.createdTime || data.CreatedTime || new Date().toISOString(),
+      data.creatorEmail || ""
     ];
 
     const lastRow = sheet.getLastRow();

@@ -551,6 +551,21 @@ function validateMobileNumber(mobileNumber) {
   return { valid: true, message: 'Valid', cleanedNumber: cleaned };
 }
 
+function validateEmailAddress(email) {
+  const trimmed = (email || '').trim();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!trimmed) {
+    return { valid: false, message: 'Email address is required' };
+  }
+
+  if (!emailRegex.test(trimmed)) {
+    return { valid: false, message: 'Please enter a valid email address' };
+  }
+
+  return { valid: true, email: trimmed };
+}
+
 // ===== Setup Quick Ticket Form =====
 function setupQuickTicketForm() {
   const form = document.getElementById('quickTicketForm');
@@ -560,6 +575,7 @@ function setupQuickTicketForm() {
     e.preventDefault();
 
     const mobileNumber = document.getElementById('mobile').value.trim();
+    const creatorEmail = document.getElementById('creatorEmail')?.value.trim() || '';
     const product = document.getElementById('product').value;
     const language = document.getElementById('language').value.trim();
     const queryDescription = document.getElementById('queries').value.trim();
@@ -572,6 +588,12 @@ function setupQuickTicketForm() {
       return;
     }
 
+    const emailValidation = validateEmailAddress(creatorEmail);
+    if (!emailValidation.valid) {
+      showToast('âŒ ' + emailValidation.message, 'error');
+      return;
+    }
+
     if (!product || !language || !queryDescription || !priority) {
       showToast('âŒ Please fill in all fields', 'error');
       return;
@@ -581,6 +603,7 @@ function setupQuickTicketForm() {
       id: generateTicketId(),
       timestamp: new Date().toISOString(),
       mobileNumber: mobileValidation.cleanedNumber,
+      creatorEmail: emailValidation.email,
       product: product,
       language: language,
       queryDescription: queryDescription,
@@ -765,6 +788,7 @@ function buildGoogleSheetPayload(ticket) {
   return {
     ticketId: ticket.id,
     mobile: ticket.mobileNumber,
+    creatorEmail: ticket.creatorEmail || '',
     product: ticket.product,
     language: ticket.language || '',
     query: ticket.queryDescription,

@@ -365,6 +365,13 @@
         </div>
 
         <div class="form-group">
+          <label for="creatorEmail">
+            <i class="fas fa-envelope"></i> Your Email
+          </label>
+          <input type="email" id="creatorEmail" placeholder="Enter your email to receive ticket updates" required>
+        </div>
+
+        <div class="form-group">
           <label for="language">
             <i class="fas fa-language"></i> Language
           </label>
@@ -669,12 +676,12 @@
       const config = getEmailJSConfig();
       
       if (!config.publicKey || !config.serviceId || !config.templateId) {
-        console.log('⚠️ EmailJS not configured - email not sent');
+        console.log('Ã¢Å¡Â Ã¯Â¸Â EmailJS not configured - email not sent');
         return;
       }
 
       if (typeof emailjs === 'undefined') {
-        console.log('⚠️ EmailJS library not loaded');
+        console.log('Ã¢Å¡Â Ã¯Â¸Â EmailJS library not loaded');
         return;
       }
 
@@ -683,9 +690,9 @@
 
         // Create formatted email content
         const emailContent = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ã¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€Â
 NEW TICKET ASSIGNED
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ã¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€Â
 
 Ticket ID:     ${ticket.id}
 Mobile Number: ${ticket.mobileNumber}
@@ -694,7 +701,7 @@ Priority:      ${ticket.priority}
 Query:         ${ticket.queryDescription}
 
 Assigned:      ${new Date().toLocaleString()}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ã¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€ÂÃ¢â€Â
 
 Please address this ticket promptly.
 
@@ -716,13 +723,13 @@ Self-Ticket Support System
 
         emailjs.send(config.serviceId, config.templateId, templateParams)
           .then((response) => {
-            console.log('✅ Email sent successfully to', agent.email);
+            console.log('Ã¢Å“â€¦ Email sent successfully to', agent.email);
           })
           .catch((error) => {
-            console.error('❌ Email sending failed:', error);
+            console.error('Ã¢ÂÅ’ Email sending failed:', error);
           });
       } catch (error) {
-        console.error('❌ EmailJS error:', error);
+        console.error('Ã¢ÂÅ’ EmailJS error:', error);
       }
     }
 
@@ -770,12 +777,13 @@ Self-Ticket Support System
 
     function assignTicketToTrainer(ticketId) {
       const trainers = getTrainers();
+
       const tickets = getTickets();
       
       const availableTrainers = trainers.filter(t => t.status === 'Available');
       
       if (availableTrainers.length === 0) {
-        showToast('⚠️ No trainers available! Ticket queued.');
+        showToast('Ã¢Å¡Â Ã¯Â¸Â No trainers available! Ticket queued.');
         return null;
       }
       
@@ -839,6 +847,21 @@ Self-Ticket Support System
       return DEFAULT_GOOGLE_SCRIPT_URL;
     }
 
+    function validateEmailAddress(email) {
+      const trimmed = (email || '').trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!trimmed) {
+        return { valid: false, message: 'Email address is required' };
+      }
+
+      if (!emailRegex.test(trimmed)) {
+        return { valid: false, message: 'Please enter a valid email address' };
+      }
+
+      return { valid: true, email: trimmed };
+    }
+
     async function submitTicketToGoogleSheet(ticket) {
       try {
         const response = await fetch(getGoogleScriptUrl(), {
@@ -856,6 +879,7 @@ Self-Ticket Support System
             status: ticket.status || 'Open',
             assignedTo: ticket.assignedTrainer || 'Unassigned',
             assignedAgentName: ticket.assignedAgentName || '',
+            creatorEmail: ticket.creatorEmail || '',
             sendAssignmentEmail: Boolean(ticket.assignedTrainer),
             timestamp: ticket.timestamp || new Date().toISOString()
           })
@@ -885,6 +909,7 @@ Self-Ticket Support System
       
       const mobile = document.getElementById('mobile').value;
       const product = document.getElementById('product').value;
+      const creatorEmail = document.getElementById('creatorEmail').value;
       const language = document.getElementById('language').value;
       const queries = document.getElementById('queries').value;
       const priority = document.querySelector('input[name="priority"]:checked').value;
@@ -892,7 +917,13 @@ Self-Ticket Support System
       // Validate mobile number
       const mobileValidation = validateMobileNumber(mobile);
       if (!mobileValidation.valid) {
-        showToast('❌ ' + mobileValidation.message);
+        showToast('Ã¢ÂÅ’ ' + mobileValidation.message);
+        return;
+      }
+      
+      const emailValidation = validateEmailAddress(creatorEmail);
+      if (!emailValidation.valid) {
+        showToast('Ã¢ÂÅ’ ' + emailValidation.message);
         return;
       }
       
@@ -903,6 +934,7 @@ Self-Ticket Support System
         id: generateTicketId(),
         timestamp: new Date().toISOString(),
         mobileNumber: mobileValidation.cleanedNumber,
+        creatorEmail: emailValidation.email,
         product: product,
         language: language,
         queryDescription: queries,
@@ -922,9 +954,9 @@ Self-Ticket Support System
       const assignedAgent = autoAssignTicket(newTicket);
       
       if (assignedAgent) {
-        showToast('✅ Ticket assigned to ' + assignedAgent.email);
+        showToast('Ã¢Å“â€¦ Ticket assigned to ' + assignedAgent.email);
       } else {
-        showToast('⚠️ Ticket submitted - no agents available');
+        showToast('Ã¢Å¡Â Ã¯Â¸Â Ticket submitted - no agents available');
       }
       
       tickets.push(newTicket);
@@ -933,14 +965,14 @@ Self-Ticket Support System
       const sheetResult = await submitTicketToGoogleSheet(newTicket);
       if (!sheetResult || sheetResult.status !== 'success') {
         console.error('Sheet sync result:', sheetResult);
-        showToast('⚠ Sheet sync failed: ' + ((sheetResult && sheetResult.message) || 'Unknown error'));
+        showToast('Ã¢Å¡Â  Sheet sync failed: ' + ((sheetResult && sheetResult.message) || 'Unknown error'));
       }
       
       // Show success
       form.style.display = 'none';
       successState.classList.add('show');
       
-      showToast('✅ Ticket submitted successfully!');
+      showToast('Ã¢Å“â€¦ Ticket submitted successfully!');
     });
 
     function resetForm() {
