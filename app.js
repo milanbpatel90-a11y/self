@@ -29,8 +29,8 @@ let trainersArray = [
 // Available agents for round-robin assignment
 let availableAgents = [];
 
-// Current position in the rotation
-let rotationIndex = 0;
+// Current position in the rotation, tracked per language pool
+let rotationState = {};
 
 // Assignment history for reporting
 let assignmentHistory = [];
@@ -47,11 +47,7 @@ function initializeRoundRobinSystem() {
     saveAvailableAgents();
   }
 
-  // Load rotation index
-  const savedIndex = localStorage.getItem(DB_KEYS.AGENT_ROTATION);
-  if (savedIndex) {
-    rotationIndex = parseInt(savedIndex, 10);
-  }
+  loadRotationState();
 
   // Load assignment history
   const savedHistory = localStorage.getItem(DB_KEYS.ASSIGNMENT_HISTORY);
@@ -59,8 +55,8 @@ function initializeRoundRobinSystem() {
     assignmentHistory = JSON.parse(savedHistory);
   }
 
-  console.log('✅ Round-Robin System initialized with', availableAgents.length, 'agents');
-  console.log('📋 Current rotation index:', rotationIndex);
+  console.log('âœ… Round-Robin System initialized with', availableAgents.length, 'agents');
+  console.log('ðŸ“‹ Current rotation state:', rotationState);
 }
 
 // Save available agents to localStorage
@@ -68,9 +64,33 @@ function saveAvailableAgents() {
   localStorage.setItem(DB_KEYS.AVAILABLE_AGENTS, JSON.stringify(availableAgents));
 }
 
-// Save rotation index to localStorage
-function saveRotationIndex() {
-  localStorage.setItem(DB_KEYS.AGENT_ROTATION, rotationIndex.toString());
+function loadRotationState() {
+  const savedRotation = localStorage.getItem(DB_KEYS.AGENT_ROTATION);
+  if (!savedRotation) {
+    rotationState = {};
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(savedRotation);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      rotationState = parsed;
+      return;
+    }
+  } catch (error) {
+    const legacyIndex = parseInt(savedRotation, 10);
+    if (!Number.isNaN(legacyIndex)) {
+      rotationState = { all: legacyIndex };
+      return;
+    }
+  }
+
+  rotationState = {};
+}
+
+// Save rotation state to localStorage
+function saveRotationState() {
+  localStorage.setItem(DB_KEYS.AGENT_ROTATION, JSON.stringify(rotationState));
 }
 
 // Save assignment history to localStorage
@@ -80,14 +100,50 @@ function saveAssignmentHistory() {
 
 function normalizeLanguageList(value) {
   if (!value) return [];
-  return value.split(',').map(item => item.trim().toLowerCase()).filter(Boolean);
+  return value
+    .split(/[,&/|]+/)
+    .map(item => normalizeLanguageKey(item))
+    .filter(Boolean);
+}
+
+function normalizeLanguageKey(value) {
+  if (!value) return '';
+
+  const normalized = value.toString().trim().toLowerCase();
+  const aliases = {
+    en: 'english',
+    eng: 'english',
+    english: 'english',
+    hi: 'hindi',
+    hindi: 'hindi',
+    ta: 'tamil',
+    tamil: 'tamil',
+    bn: 'bengali',
+    bengali: 'bengali',
+    bangla: 'bengali',
+    gu: 'gujarati',
+    gujarati: 'gujarati',
+    mr: 'marathi',
+    marathi: 'marathi',
+    te: 'telugu',
+    telugu: 'telugu',
+    kn: 'kannada',
+    kannada: 'kannada',
+    ml: 'malayalam',
+    malayalam: 'malayalam',
+    pa: 'punjabi',
+    punjabi: 'punjabi'
+  };
+
+  return aliases[normalized] || normalized;
 }
 
 function agentSupportsLanguage(agent, language) {
-  if (!language) return true;
+  const normalizedLanguage = normalizeLanguageKey(language);
+  if (!normalizedLanguage) return true;
   const agentLanguages = normalizeLanguageList(agent.language || '');
-  if (agentLanguages.length === 0) return true;
-  return agentLanguages.includes(language.trim().toLowerCase());
+  if (agentLanguages.length === 0) return false;
+  return agentLanguages.includes(normalizedLanguage);
 }
 
 // Get the next agent in round-robin rotation
@@ -99,25 +155,36 @@ function getNextAgent(preferredLanguage = '') {
   }
   
   console.log('Available agents:', availableAgents);
+  loadRotationState();
   
   // Filter only active agents
   const activeAgents = availableAgents.filter(agent => agent.status === 'Active');
   
   if (activeAgents.length === 0) {
-    console.warn('⚠️ No active agents available for assignment');
+    console.warn('âš ï¸ No active agents available for assignment');
     console.warn('Available agents count:', availableAgents.length);
     return null;
   }
 
-  const languageMatchedAgents = activeAgents.filter(agent => agentSupportsLanguage(agent, preferredLanguage));
-  const rotationPool = languageMatchedAgents.length > 0 ? languageMatchedAgents : activeAgents;
+  const normalizedLanguage = normalizeLanguageKey(preferredLanguage);
+  const rotationPool = normalizedLanguage
+    ? activeAgents.filter(agent => agentSupportsLanguage(agent, normalizedLanguage))
+    : activeAgents;
+
+  if (rotationPool.length === 0) {
+    console.warn('Ã¢Å¡Â Ã¯Â¸Â No active agents available for language:', preferredLanguage);
+    return null;
+  }
+
+  const rotationKey = normalizedLanguage || 'all';
+  const currentIndex = rotationState[rotationKey] || 0;
 
   // Get the next agent in rotation
-  const agent = rotationPool[rotationIndex % rotationPool.length];
+  const agent = rotationPool[currentIndex % rotationPool.length];
   
   // Increment rotation index for next assignment
-  rotationIndex = (rotationIndex + 1) % rotationPool.length;
-  saveRotationIndex();
+  rotationState[rotationKey] = (currentIndex + 1) % rotationPool.length;
+  saveRotationState();
 
   return agent;
 }
@@ -135,7 +202,7 @@ function addAgent(name, email, language) {
   };
   availableAgents.push(newAgent);
   saveAvailableAgents();
-  console.log('✅ Agent added:', newAgent);
+  console.log('âœ… Agent added:', newAgent);
   return newAgent;
 }
 
@@ -146,7 +213,7 @@ function removeAgent(agentId) {
     agent.status = 'Inactive';
     agent.removedAt = new Date().toISOString();
     saveAvailableAgents();
-    console.log('✅ Agent removed:', agent.email);
+    console.log('âœ… Agent removed:', agent.email);
     return true;
   }
   return false;
@@ -159,7 +226,7 @@ function setAgentStatus(agentId, status) {
     agent.status = status;
     agent.statusChangedAt = new Date().toISOString();
     saveAvailableAgents();
-    console.log('✅ Agent status changed:', agent.email, '->', status);
+    console.log('âœ… Agent status changed:', agent.email, '->', status);
     return true;
   }
   return false;
@@ -171,10 +238,10 @@ function reorderRotation(agentId) {
   if (agentIndex > 0) {
     const agent = availableAgents.splice(agentIndex, 1)[0];
     availableAgents.unshift(agent);
-    rotationIndex = 0;
+    rotationState = {};
     saveAvailableAgents();
-    saveRotationIndex();
-    console.log('✅ Rotation reordered, agent moved to front:', agent.email);
+    saveRotationState();
+    console.log('âœ… Rotation reordered, agent moved to front:', agent.email);
     return true;
   }
   return false;
@@ -182,9 +249,9 @@ function reorderRotation(agentId) {
 
 // Reset the rotation to start from the beginning
 function resetRotation() {
-  rotationIndex = 0;
-  saveRotationIndex();
-  console.log('✅ Rotation reset to beginning');
+  rotationState = {};
+  saveRotationState();
+  console.log('âœ… Rotation reset to beginning');
 }
 
 // Record an assignment in history
@@ -212,7 +279,7 @@ function recordAssignment(ticket, agent) {
   agent.assignedCount++;
   saveAvailableAgents();
 
-  console.log('✅ Assignment recorded:', record);
+  console.log('âœ… Assignment recorded:', record);
   return record;
 }
 
@@ -252,7 +319,7 @@ function autoAssignTicket(ticket) {
   const agent = getNextAgent(ticket.language || '');
   
   if (!agent) {
-    console.error('❌ Cannot assign ticket - no active agents available');
+    console.error('âŒ Cannot assign ticket - no active agents available for language:', ticket.language || 'Any');
     return null;
   }
 
@@ -266,7 +333,7 @@ function autoAssignTicket(ticket) {
   // Record the assignment
   recordAssignment(ticket, agent);
 
-  console.log('✅ Ticket auto-assigned:', ticket.id, '->', agent.email);
+  console.log('âœ… Ticket auto-assigned:', ticket.id, '->', agent.email);
   return agent;
 }
 
@@ -300,8 +367,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     ];
     updateDashboardQueue();
-    console.log('✅ Test ticket created');
-    showToast('✅ Test ticket created!', 'success');
+    console.log('âœ… Test ticket created');
+    showToast('âœ… Test ticket created!', 'success');
   });
   document.body.appendChild(testButton);
 
@@ -350,8 +417,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     ticketsArray = [testTicket]; // Replace any existing tickets
     updateDashboardQueue();
-    console.log('✅ Test ticket created');
-    showToast('✅ Test ticket created!', 'success');
+    console.log('âœ… Test ticket created');
+    showToast('âœ… Test ticket created!', 'success');
   };
 
    // Auto-refresh queue every 2 seconds (disabled for debugging)
@@ -365,10 +432,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Refresh when page becomes visible
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-      console.log('📊 Dashboard is now visible - refreshing');
+      console.log('ðŸ“Š Dashboard is now visible - refreshing');
       loadFromLocalStorage();
       updateDashboardQueue();
-      showToast('✅ Dashboard synced', 'success');
+      showToast('âœ… Dashboard synced', 'success');
     }
   });
 });
@@ -386,10 +453,10 @@ function loadFromLocalStorage() {
   // Load tickets from localStorage
   if (savedTickets) {
     ticketsArray = JSON.parse(savedTickets);
-    console.log('✅ Loaded ' + ticketsArray.length + ' tickets from localStorage');
+    console.log('âœ… Loaded ' + ticketsArray.length + ' tickets from localStorage');
   } else {
     ticketsArray = [];
-    console.log('⚠️ No tickets in localStorage');
+    console.log('âš ï¸ No tickets in localStorage');
   }
 
   if (savedTrainers) {
@@ -501,12 +568,12 @@ function setupQuickTicketForm() {
     // Validate mobile number
     const mobileValidation = validateMobileNumber(mobileNumber);
     if (!mobileValidation.valid) {
-      showToast('❌ ' + mobileValidation.message, 'error');
+      showToast('âŒ ' + mobileValidation.message, 'error');
       return;
     }
 
     if (!product || !language || !queryDescription || !priority) {
-      showToast('❌ Please fill in all fields', 'error');
+      showToast('âŒ Please fill in all fields', 'error');
       return;
     }
 
@@ -529,9 +596,9 @@ function setupQuickTicketForm() {
     
     if (assignedAgent) {
       emailResult = { success: true, message: 'Assignment email requested via Google Apps Script.' };
-      showToast('✅ Ticket submitted and auto-assigned to ' + assignedAgent.email, 'success');
+      showToast('âœ… Ticket submitted and auto-assigned to ' + assignedAgent.email, 'success');
     } else {
-      showToast('⚠️ Ticket submitted but no agents available for assignment', 'error');
+      showToast('âš ï¸ Ticket submitted but no agents available for assignment', 'error');
     }
 
     ticketsArray.push(newTicket);
@@ -785,18 +852,28 @@ async function syncAllTicketsToGoogleSheet() {
 function setupAgentManagementForm() {
   const form = document.getElementById('addAgentForm');
   if (!form) return;
+  const cancelButton = document.getElementById('agentFormCancel');
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
 
+    const editId = document.getElementById('agentEditId').value.trim();
     const name = document.getElementById('agentName').value.trim();
     const email = document.getElementById('agentEmail').value.trim();
     const language = document.getElementById('agentLanguage').value.trim();
 
-    if (addNewAgent(name, email, language)) {
-      form.reset();
+    const isSaved = editId
+      ? updateExistingAgent(Number(editId), name, email, language)
+      : addNewAgent(name, email, language);
+
+    if (isSaved) {
+      resetAgentForm();
     }
   });
+
+  if (cancelButton) {
+    cancelButton.addEventListener('click', resetAgentForm);
+  }
 }
 
 // ===== Update Dashboard Queue =====
@@ -1020,14 +1097,14 @@ function updateArchiveList() {
 function manualRefreshQueue() {
   loadFromLocalStorage();
   updateDashboardQueue();
-  showToast('✅ Dashboard refreshed!', 'success');
+  showToast('âœ… Dashboard refreshed!', 'success');
 }
 
 // ===== Claim/Assign Ticket =====
 function claimTicket(ticketId) {
   const ticketIndex = ticketsArray.findIndex(ticket => ticket.id === ticketId);
   if (ticketIndex === -1) {
-    showToast('❌ Ticket not found', 'error');
+    showToast('âŒ Ticket not found', 'error');
     return;
   }
 
@@ -1057,7 +1134,7 @@ function claimTicket(ticketId) {
     const email = document.getElementById('emailInput').value.trim();
 
     if (!email) {
-      showToast('❌ Please enter a valid email', 'error');
+      showToast('âŒ Please enter a valid email', 'error');
       return;
     }
 
@@ -1072,7 +1149,7 @@ function claimTicket(ticketId) {
     sendEmail(email, ticket);
 
     modal.remove();
-    showToast('✅ Ticket assigned and archived', 'success');
+    showToast('âœ… Ticket assigned and archived', 'success');
   });
 
   modal.addEventListener('click', (e) => {
@@ -1135,25 +1212,25 @@ function sendAssignmentEmail(agent, ticket) {
 function sendEmail(email, ticket) {
   const emailContent = generateEmailContent(email, ticket);
   showEmailPreviewModal(emailContent, email, ticket);
-  console.log('📧 EMAIL TO SEND:', emailContent);
+  console.log('ðŸ“§ EMAIL TO SEND:', emailContent);
 
   const config = getEmailJSConfig();
-  console.log('🔧 EmailJS Config:', config);
+  console.log('ðŸ”§ EmailJS Config:', config);
 
   if (!config.publicKey || !config.serviceId || !config.templateId) {
-    console.log('⚠️ EmailJS not configured');
-    showToast('❌ EmailJS not configured. Please set up credentials in Settings.', 'error');
+    console.log('âš ï¸ EmailJS not configured');
+    showToast('âŒ EmailJS not configured. Please set up credentials in Settings.', 'error');
     return;
   }
 
   if (typeof emailjs === 'undefined') {
-    console.log('⚠️ EmailJS library not loaded');
-    showToast('❌ EmailJS library failed to load. Please refresh the page.', 'error');
+    console.log('âš ï¸ EmailJS library not loaded');
+    showToast('âŒ EmailJS library failed to load. Please refresh the page.', 'error');
     return;
   }
 
   try {
-    console.log('🔧 Initializing EmailJS with public key:', config.publicKey.substring(0, 10) + '...');
+    console.log('ðŸ”§ Initializing EmailJS with public key:', config.publicKey.substring(0, 10) + '...');
     emailjs.init(config.publicKey);
 
     const templateParams = {
@@ -1167,16 +1244,16 @@ function sendEmail(email, ticket) {
       assigned_date: new Date().toLocaleString()
     };
 
-    console.log('📧 Sending email with parameters:', templateParams);
+    console.log('ðŸ“§ Sending email with parameters:', templateParams);
 
     emailjs.send(config.serviceId, config.templateId, templateParams)
       .then((response) => {
-        console.log('✅ Email sent successfully:', response);
-        showToast('✅ Email sent to ' + email, 'success');
+        console.log('âœ… Email sent successfully:', response);
+        showToast('âœ… Email sent to ' + email, 'success');
       })
       .catch((error) => {
-        console.error('❌ Email sending failed:', error);
-        console.error('❌ Error details:', {
+        console.error('âŒ Email sending failed:', error);
+        console.error('âŒ Error details:', {
           error_text: error.text,
           error_message: error.message,
           error_status: error.status,
@@ -1189,18 +1266,18 @@ function sendEmail(email, ticket) {
         else if (error.message) errorMessage = error.message;
         else if (error.status) errorMessage = 'HTTP Error: ' + error.status;
 
-        showToast('❌ Failed to send email. Error: ' + errorMessage, 'error');
+        showToast('âŒ Failed to send email. Error: ' + errorMessage, 'error');
       });
   } catch (error) {
-    console.error('❌ EmailJS initialization error:', error);
-    showToast('❌ EmailJS configuration error. Please check your credentials.', 'error');
+    console.error('âŒ EmailJS initialization error:', error);
+    showToast('âŒ EmailJS configuration error. Please check your credentials.', 'error');
   }
 }
 
 function generateEmailContent(email, ticket) {
-  return '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+  return 'â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n' +
     'TICKET ASSIGNED\n' +
-    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+    'â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n' +
     'Dear Support Team,\n\n' +
     'You have been assigned a new ticket.\n\n' +
     'Ticket ID:       ' + ticket.id + '\n' +
@@ -1241,7 +1318,7 @@ function showEmailPreviewModal(emailContent, email, ticket) {
       const config = getEmailJSConfig();
       
       if (!config.publicKey || !config.serviceId || !config.templateId) {
-        showToast('❌ EmailJS not configured. Please set up credentials in Settings.', 'error');
+        showToast('âŒ EmailJS not configured. Please set up credentials in Settings.', 'error');
         return;
       }
 
@@ -1260,13 +1337,13 @@ function showEmailPreviewModal(emailContent, email, ticket) {
              if (typeof emailjs !== 'undefined') {
                sendEmailInternal(email, ticket, config, modal);
              } else {
-               showToast('❌ EmailJS library failed to initialize. Please refresh the page.', 'error');
+               showToast('âŒ EmailJS library failed to initialize. Please refresh the page.', 'error');
              }
            }, 500);
          };
          script.onerror = () => {
            console.error('Failed to load EmailJS library');
-           showToast('❌ Failed to load EmailJS library. Please check your internet connection and refresh the page.', 'error');
+           showToast('âŒ Failed to load EmailJS library. Please check your internet connection and refresh the page.', 'error');
          };
          document.head.appendChild(script);
          
@@ -1275,7 +1352,7 @@ function showEmailPreviewModal(emailContent, email, ticket) {
       
       sendEmailInternal(email, ticket, config, modal);
     } else {
-      showToast('❌ Ticket not found', 'error');
+      showToast('âŒ Ticket not found', 'error');
     }
   });
   
@@ -1296,23 +1373,23 @@ function showEmailPreviewModal(emailContent, email, ticket) {
 
       emailjs.send(config.serviceId, config.templateId, templateParams)
         .then((response) => {
-          console.log('✅ Email sent successfully:', response);
-          showToast('✅ Email sent to ' + email, 'success');
+          console.log('âœ… Email sent successfully:', response);
+          showToast('âœ… Email sent to ' + email, 'success');
           modal.remove(); // Close modal after successful send
         })
         .catch((error) => {
-          console.error('❌ Email sending failed:', error);
+          console.error('âŒ Email sending failed:', error);
           
           let errorMessage = 'Unknown error';
           if (error.text) errorMessage = error.text;
           else if (error.message) errorMessage = error.message;
           else if (error.status) errorMessage = 'HTTP Error: ' + error.status;
 
-          showToast('❌ Failed to send email. Error: ' + errorMessage, 'error');
+          showToast('âŒ Failed to send email. Error: ' + errorMessage, 'error');
         });
     } catch (error) {
-      console.error('❌ EmailJS initialization error:', error);
-      showToast('❌ EmailJS configuration error. Please check your credentials.', 'error');
+      console.error('âŒ EmailJS initialization error:', error);
+      showToast('âŒ EmailJS configuration error. Please check your credentials.', 'error');
     }
   }
 
@@ -1343,7 +1420,7 @@ function setupEmailJSConfigForm() {
     };
 
     if (!newConfig.publicKey || !newConfig.serviceId || !newConfig.templateId) {
-      showToast('❌ Fill in all fields', 'error');
+      showToast('âŒ Fill in all fields', 'error');
       return;
     }
 
@@ -1359,10 +1436,10 @@ function setupEmailJSConfigForm() {
       statusDiv.style.background = '#d1fae5';
       statusDiv.style.borderLeft = '4px solid #10b981';
       statusDiv.style.color = '#065f46';
-      statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> ✅ EmailJS configured permanently!';
+      statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> âœ… EmailJS configured permanently!';
     }
 
-    showToast('✅ EmailJS configured permanently!', 'success');
+    showToast('âœ… EmailJS configured permanently!', 'success');
 
     setTimeout(() => {
       if (statusDiv) statusDiv.style.display = 'none';
@@ -1398,38 +1475,38 @@ function checkEmailJSConfiguration() {
     statusDiv.style.background = '#d1fae5';
     statusDiv.style.borderLeft = '4px solid #10b981';
     statusDiv.style.color = '#065f46';
-    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> ✅ EmailJS is configured!';
+    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> âœ… EmailJS is configured!';
   }
 }
 
 // ===== Helper Functions =====
 function switchTab(tabId) {
-  console.log('📌 switchTab called with:', tabId);
+  console.log('ðŸ“Œ switchTab called with:', tabId);
   
   const tabButtons = document.querySelectorAll('.tab-btn');
   const tabContents = document.querySelectorAll('.tab-content');
   
-  console.log('🚀 Found buttons:', tabButtons.length, 'contents:', tabContents.length);
+  console.log('ðŸš€ Found buttons:', tabButtons.length, 'contents:', tabContents.length);
   
   // Remove active class from all buttons and contents
   tabButtons.forEach(btn => {
     btn.classList.remove('active');
-    console.log('🔘 Button removed active:', btn.getAttribute('data-tab'));
+    console.log('ðŸ”˜ Button removed active:', btn.getAttribute('data-tab'));
   });
   
   tabContents.forEach(content => {
     content.classList.remove('active');
     content.style.display = 'none';
-    console.log('📄 Content removed active:', content.id);
+    console.log('ðŸ“„ Content removed active:', content.id);
   });
   
   // Add active class to selected button
   const selectedButton = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
   if (selectedButton) {
     selectedButton.classList.add('active');
-    console.log('✅ Button added active:', selectedButton.getAttribute('data-tab'));
+    console.log('âœ… Button added active:', selectedButton.getAttribute('data-tab'));
   } else {
-    console.error('❌ Button not found for tab:', tabId);
+    console.error('âŒ Button not found for tab:', tabId);
   }
   
   // Show selected tab content
@@ -1437,15 +1514,15 @@ function switchTab(tabId) {
   if (selectedContent) {
     selectedContent.classList.add('active');
     selectedContent.style.display = 'block';
-    console.log('✅ Content added active:', selectedContent.id);
+    console.log('âœ… Content added active:', selectedContent.id);
   } else {
-    console.error('❌ Content not found for tab:', tabId);
+    console.error('âŒ Content not found for tab:', tabId);
   }
   
   // Always update agents list for debugging
-  console.log('🔄 Calling updateAvailableAgentsList');
+  console.log('ðŸ”„ Calling updateAvailableAgentsList');
   updateAvailableAgentsList();
-  console.log('🔄 Calling updateAssignmentHistory');
+  console.log('ðŸ”„ Calling updateAssignmentHistory');
   updateAssignmentHistory();
   
   // Update archive list when switching to archive tab
@@ -1505,7 +1582,7 @@ function updateTrainerList() {
         <div style="font-weight: 600;">${escapeHtml(trainer.name)}</div>
         <div style="font-size: 0.85rem; color: #6b7280;">
           <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${trainer.status === 'Available' ? '#10b981' : '#f59e0b'}; margin-right: 0.5rem;"></span>
-          ${trainer.status} • Load: ${trainer.load}
+          ${trainer.status} â€¢ Load: ${trainer.load}
         </div>
       </div>
     </div>
@@ -1542,10 +1619,10 @@ function escapeHtml(text) {
 
 // Update the available agents list in the UI
 function updateAvailableAgentsList() {
-  console.log('🚨 updateAvailableAgentsList is being called!');
+  console.log('ðŸš¨ updateAvailableAgentsList is being called!');
   console.log('availableAgents variable:', availableAgents);
   console.log('LocalStorage agents:', localStorage.getItem('selfTicket_available_agents'));
-  console.log('📋 updateAvailableAgentsList called');
+  console.log('ðŸ“‹ updateAvailableAgentsList called');
   console.log('availableAgents:', availableAgents);
   console.log('localStorage:', localStorage.getItem('selfTicket_available_agents'));
   const container = document.getElementById('availableAgentsList');
@@ -1568,11 +1645,17 @@ function updateAvailableAgentsList() {
             <div style="font-size: 0.8rem; color: #9ca3af;">Assigned: ${agent.assignedCount || 0} tickets</div>
           </div>
           <div style="display: flex; gap: 0.5rem;">
-            <button onclick="toggleAgentStatus(${agent.id})" style="padding: 0.4rem 0.8rem; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
-              <i class="fas fa-pause"></i>
+            <button onclick="editAgent(${agent.id})" title="Edit agent" style="padding: 0.4rem 0.8rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+              <i class="fas fa-pen"></i>
             </button>
-            <button onclick="removeAgentFromList(${agent.id})" style="padding: 0.4rem 0.8rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+            <button onclick="removeAgentFromList(${agent.id})" title="Remove agent" style="padding: 0.4rem 0.8rem; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
               <i class="fas fa-trash"></i>
+            </button>
+            <button onclick="activateAgent(${agent.id})" title="Set active" style="padding: 0.4rem 0.8rem; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; opacity: 0.55;">
+              <i class="fas fa-play"></i>
+            </button>
+            <button onclick="deactivateAgent(${agent.id})" title="Set inactive" style="padding: 0.4rem 0.8rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+              <i class="fas fa-pause"></i>
             </button>
           </div>
         </div>
@@ -1588,9 +1671,20 @@ function updateAvailableAgentsList() {
             <div style="font-size: 0.85rem; color: #9ca3af;">${escapeHtml(agent.email)}</div>
             <div style="font-size: 0.8rem; color: #9ca3af;">Language: ${escapeHtml(agent.language || 'Any')}</div>
           </div>
-          <button onclick="toggleAgentStatus(${agent.id})" style="padding: 0.4rem 0.8rem; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
-            <i class="fas fa-play"></i> Reactivate
-          </button>
+          <div style="display: flex; gap: 0.5rem;">
+            <button onclick="editAgent(${agent.id})" title="Edit agent" style="padding: 0.4rem 0.8rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+              <i class="fas fa-pen"></i>
+            </button>
+            <button onclick="removeAgentFromList(${agent.id})" title="Remove agent" style="padding: 0.4rem 0.8rem; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+              <i class="fas fa-trash"></i>
+            </button>
+            <button onclick="activateAgent(${agent.id})" title="Set active" style="padding: 0.4rem 0.8rem; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+              <i class="fas fa-play"></i>
+            </button>
+            <button onclick="deactivateAgent(${agent.id})" title="Set inactive" style="padding: 0.4rem 0.8rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; opacity: 0.55;">
+              <i class="fas fa-pause"></i>
+            </button>
+          </div>
         </div>
       `).join('')}
     </div>
@@ -1600,7 +1694,9 @@ function updateAvailableAgentsList() {
   // Update rotation info
   const rotationInfo = document.getElementById('rotationInfo');
   if (rotationInfo) {
-    const nextAgent = activeAgents.length > 0 ? activeAgents[rotationIndex % activeAgents.length] : null;
+    loadRotationState();
+    const generalRotationIndex = rotationState.all || 0;
+    const nextAgent = activeAgents.length > 0 ? activeAgents[generalRotationIndex % activeAgents.length] : null;
     rotationInfo.innerHTML = `
       <div style="padding: 1rem; background: #eff6ff; border-radius: 6px; border-left: 3px solid #4f46e5;">
         <div style="font-weight: 600; color: #4f46e5; margin-bottom: 0.5rem;">
@@ -1611,7 +1707,7 @@ function updateAvailableAgentsList() {
         </div>
         ${nextAgent ? `<div style="font-size: 0.85rem; color: #6b7280; margin-top: 0.4rem;"><strong>Languages:</strong> ${escapeHtml(nextAgent.language || 'Any')}</div>` : ''}
         <div style="font-size: 0.85rem; color: #6b7280; margin-top: 0.5rem;">
-          <strong>Rotation Index:</strong> ${rotationIndex} | <strong>Total Active:</strong> ${activeAgents.length}
+          <strong>General Rotation Index:</strong> ${generalRotationIndex} | <strong>Total Active:</strong> ${activeAgents.length}
         </div>
       </div>
     `;
@@ -1629,38 +1725,154 @@ function toggleAgentStatus(agentId) {
   }
 }
 
-// Remove agent from the list
-function removeAgentFromList(agentId) {
-  if (confirm('Are you sure you want to remove this agent from the rotation?')) {
-    removeAgent(agentId);
+function activateAgent(agentId) {
+  if (setAgentStatus(agentId, 'Active')) {
     updateAvailableAgentsList();
-    showToast('✅ Agent removed from rotation', 'success');
+    showToast('✅ Agent activated', 'success');
   }
 }
 
-// Add new agent via form
+function deactivateAgent(agentId) {
+  if (setAgentStatus(agentId, 'Inactive')) {
+    updateAvailableAgentsList();
+    showToast('✅ Agent inactivated', 'success');
+  }
+}
+
+function deleteAgent(agentId) {
+  const agent = availableAgents.find(a => a.id === agentId);
+  if (!agent) return false;
+
+  availableAgents = availableAgents.filter(a => a.id !== agentId);
+  saveAvailableAgents();
+  rotationState = {};
+  saveRotationState();
+
+  const editIdInput = document.getElementById('agentEditId');
+  if (editIdInput && editIdInput.value === String(agentId)) {
+    resetAgentForm();
+  }
+
+  return true;
+}
+
+// Remove agent from the list
+function removeAgentFromList(agentId) {
+  if (confirm('Are you sure you want to remove this agent from the rotation?')) {
+    if (deleteAgent(agentId)) {
+      updateAvailableAgentsList();
+      showToast('✅ Agent removed from rotation', 'success');
+    }
+  }
+}
+
 function addNewAgent(name, email, language) {
   if (!name || !email || !language) {
-    showToast('❌ Please provide both name and email', 'error');
+    showToast('âŒ Please provide name, email, and language', 'error');
     return false;
   }
 
   // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    showToast('❌ Please enter a valid email address', 'error');
+    showToast('âŒ Please enter a valid email address', 'error');
     return false;
   }
 
   // Check if email already exists
   if (availableAgents.some(a => a.email.toLowerCase() === email.toLowerCase())) {
-    showToast('❌ This email is already in the agent list', 'error');
+    showToast('âŒ This email is already in the agent list', 'error');
     return false;
   }
 
   addAgent(name, email, language);
   updateAvailableAgentsList();
-  showToast('✅ Agent added: ' + email, 'success');
+  showToast('âœ… Agent added: ' + email, 'success');
+  return true;
+}
+
+function editAgent(agentId) {
+  const agent = availableAgents.find(a => a.id === agentId);
+  if (!agent) {
+    showToast('âŒ Agent not found', 'error');
+    return;
+  }
+
+  const editIdInput = document.getElementById('agentEditId');
+  const nameInput = document.getElementById('agentName');
+  const emailInput = document.getElementById('agentEmail');
+  const languageInput = document.getElementById('agentLanguage');
+  const title = document.getElementById('agentFormTitle');
+  const description = document.getElementById('agentFormDescription');
+  const submitButton = document.getElementById('agentFormSubmit');
+  const cancelButton = document.getElementById('agentFormCancel');
+
+  if (!editIdInput || !nameInput || !emailInput || !languageInput) return;
+
+  editIdInput.value = String(agent.id);
+  nameInput.value = agent.name || '';
+  emailInput.value = agent.email || '';
+  languageInput.value = agent.language || '';
+
+  if (title) title.textContent = 'Edit Agent';
+  if (description) description.textContent = 'Update the agent name, email address, and language for round-robin assignment.';
+  if (submitButton) submitButton.innerHTML = '<i class="fas fa-pen"></i> Update Agent';
+  if (cancelButton) cancelButton.style.display = 'inline-flex';
+
+  nameInput.focus();
+}
+
+function resetAgentForm() {
+  const form = document.getElementById('addAgentForm');
+  const editIdInput = document.getElementById('agentEditId');
+  const title = document.getElementById('agentFormTitle');
+  const description = document.getElementById('agentFormDescription');
+  const submitButton = document.getElementById('agentFormSubmit');
+  const cancelButton = document.getElementById('agentFormCancel');
+
+  if (form) form.reset();
+  if (editIdInput) editIdInput.value = '';
+  if (title) title.textContent = 'Add Available Agent';
+  if (description) description.textContent = 'Enter Agent Name, Agent Email Address, and Language. This list is used for round-robin auto assignment.';
+  if (submitButton) submitButton.innerHTML = '<i class="fas fa-user-plus"></i> Add Agent';
+  if (cancelButton) cancelButton.style.display = 'none';
+}
+
+function updateExistingAgent(agentId, name, email, language) {
+  if (!name || !email || !language) {
+    showToast('âŒ Please provide name, email, and language', 'error');
+    return false;
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    showToast('âŒ Please enter a valid email address', 'error');
+    return false;
+  }
+
+  const agentIndex = availableAgents.findIndex(a => a.id === agentId);
+  if (agentIndex === -1) {
+    showToast('âŒ Agent not found', 'error');
+    return false;
+  }
+
+  const duplicateAgent = availableAgents.find(a => a.id !== agentId && a.email.toLowerCase() === email.toLowerCase());
+  if (duplicateAgent) {
+    showToast('âŒ This email is already in the agent list', 'error');
+    return false;
+  }
+
+  availableAgents[agentIndex] = {
+    ...availableAgents[agentIndex],
+    name,
+    email,
+    language,
+    updatedAt: new Date().toISOString()
+  };
+
+  saveAvailableAgents();
+  updateAvailableAgentsList();
+  showToast('âœ… Agent updated: ' + email, 'success');
   return true;
 }
 
@@ -1668,7 +1880,7 @@ function addNewAgent(name, email, language) {
 function resetRoundRobinRotation() {
   resetRotation();
   updateAvailableAgentsList();
-  showToast('✅ Rotation reset to beginning', 'success');
+  showToast('âœ… Rotation reset to beginning', 'success');
 }
 
 // ===== Assignment History UI =====
@@ -1791,7 +2003,10 @@ globalThis.initializeRoundRobinSystem = initializeRoundRobinSystem;
 globalThis.updateAvailableAgentsList = updateAvailableAgentsList;
 globalThis.switchTab = switchTab;
 globalThis.toggleAgentStatus = toggleAgentStatus;
+globalThis.activateAgent = activateAgent;
+globalThis.deactivateAgent = deactivateAgent;
 globalThis.removeAgentFromList = removeAgentFromList;
+globalThis.editAgent = editAgent;
 globalThis.addNewAgent = addNewAgent;
 globalThis.resetRoundRobinRotation = resetRoundRobinRotation;
 globalThis.updateAssignmentHistory = updateAssignmentHistory;
@@ -1808,7 +2023,7 @@ function exportAssignmentHistory() {
   const history = getAssignmentHistory();
   
   if (history.length === 0) {
-    showToast('❌ No assignment history to export', 'error');
+    showToast('âŒ No assignment history to export', 'error');
     return;
   }
 
@@ -1833,7 +2048,7 @@ function exportAssignmentHistory() {
   link.click();
   document.body.removeChild(link);
 
-  showToast('✅ Assignment history exported successfully', 'success');
+  showToast('âœ… Assignment history exported successfully', 'success');
 }
 
 globalThis.exportAssignmentHistory = exportAssignmentHistory;

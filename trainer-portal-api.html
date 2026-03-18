@@ -254,8 +254,7 @@
 
   <script>
     // ==================== CONFIGURATION ====================
-    // Replace with your Google Apps Script URL
-    const GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbxG6VZG9N6W4L5M0kL4kJ6nH8vT2xY8zQ9kR1sL3mN5pQ7rS9tU0vW2xY4Z6aB8cD0eF/exec";
+    const GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbyqC6442w0hqOQga0vTOeO7BnoShm4j7DEPg-oxoo3lHtkdMEk03yHGePQbz7fkv_M/exec";
     
     // Replace with your EmailJS credentials
     const EMAILJS_CONFIG = {
@@ -264,19 +263,129 @@
       templateId: "YOUR_TEMPLATE_ID"
     };
     
-    // Round-robin agents (hardcoded or load from somewhere)
-    const AGENTS = [
-      { email: "abhay.padhiyar@petpooja.com", name: "Abhay" },
-      { email: "milan.patel@petpooja.com", name: "Milan" }
+    // Round-robin agents: prefer configured localStorage agents, fall back to a small default set
+    const DEFAULT_AGENTS = [
+      { email: "abhay.padhiyar@petpooja.com", name: "Abhay", language: "English" },
+      { email: "milan.patel@petpooja.com", name: "Milan", language: "English" },
+      { email: "yash.kariya@petpooja.com", name: "Yash", language: "Tamil" }
     ];
     // =====================================================
 
-    let rotationIndex = 0;
+    let rotationState = {};
 
-    function getNextAgent() {
-      if (AGENTS.length === 0) return null;
-      const agent = AGENTS[rotationIndex % AGENTS.length];
-      rotationIndex = (rotationIndex + 1) % AGENTS.length;
+    function loadConfiguredAgents() {
+      try {
+        const savedAgents = localStorage.getItem('selfTicket_available_agents');
+        if (!savedAgents) return DEFAULT_AGENTS;
+
+        const parsed = JSON.parse(savedAgents);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          return DEFAULT_AGENTS;
+        }
+
+        const activeAgents = parsed.filter(agent => agent.status === 'Active');
+        return activeAgents.length > 0 ? activeAgents : DEFAULT_AGENTS;
+      } catch (error) {
+        console.warn('Failed to load configured agents, using defaults', error);
+        return DEFAULT_AGENTS;
+      }
+    }
+
+    function loadRotationState() {
+      const savedRotation = localStorage.getItem('selfTicket_agent_rotation');
+      if (!savedRotation) {
+        rotationState = {};
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(savedRotation);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          rotationState = parsed;
+          return;
+        }
+      } catch (error) {
+        const legacyIndex = parseInt(savedRotation, 10);
+        if (!Number.isNaN(legacyIndex)) {
+          rotationState = { all: legacyIndex };
+          return;
+        }
+      }
+
+      rotationState = {};
+    }
+
+    function saveRotationState() {
+      localStorage.setItem('selfTicket_agent_rotation', JSON.stringify(rotationState));
+    }
+
+    function normalizeLanguageKey(value) {
+      if (!value) return '';
+
+      const normalized = value.toString().trim().toLowerCase();
+      const aliases = {
+        en: 'english',
+        eng: 'english',
+        english: 'english',
+        hi: 'hindi',
+        hindi: 'hindi',
+        ta: 'tamil',
+        tamil: 'tamil',
+        bn: 'bengali',
+        bengali: 'bengali',
+        bangla: 'bengali',
+        gu: 'gujarati',
+        gujarati: 'gujarati',
+        mr: 'marathi',
+        marathi: 'marathi',
+        te: 'telugu',
+        telugu: 'telugu',
+        kn: 'kannada',
+        kannada: 'kannada',
+        ml: 'malayalam',
+        malayalam: 'malayalam',
+        pa: 'punjabi',
+        punjabi: 'punjabi'
+      };
+
+      return aliases[normalized] || normalized;
+    }
+
+    function normalizeLanguageList(value) {
+      if (!value) return [];
+      return value
+        .split(/[,&/|]+/)
+        .map(item => normalizeLanguageKey(item))
+        .filter(Boolean);
+    }
+
+    function agentSupportsLanguage(agent, language) {
+      const normalizedLanguage = normalizeLanguageKey(language);
+      if (!normalizedLanguage) return true;
+      const agentLanguages = normalizeLanguageList(agent.language || '');
+      if (agentLanguages.length === 0) return false;
+      return agentLanguages.includes(normalizedLanguage);
+    }
+
+    function getNextAgent(preferredLanguage = '') {
+      const agents = loadConfiguredAgents();
+      if (agents.length === 0) return null;
+
+      loadRotationState();
+      const normalizedLanguage = normalizeLanguageKey(preferredLanguage);
+      const rotationPool = normalizedLanguage
+        ? agents.filter(agent => agentSupportsLanguage(agent, normalizedLanguage))
+        : agents;
+
+      if (rotationPool.length === 0) {
+        return null;
+      }
+
+      const rotationKey = normalizedLanguage || 'all';
+      const currentIndex = rotationState[rotationKey] || 0;
+      const agent = rotationPool[currentIndex % rotationPool.length];
+      rotationState[rotationKey] = (currentIndex + 1) % rotationPool.length;
+      saveRotationState();
       return agent;
     }
 
@@ -336,16 +445,27 @@
         const response = await fetch(GOOGLE_SHEET_API, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'text/plain;charset=utf-8'
           },
           body: JSON.stringify(ticket)
         });
+
+        if (!response.ok) {
+          return {
+            status: 'error',
+            message: `HTTP ${response.status}`
+          };
+        }
+
         const result = await response.json();
         console.log('Google Sheet response:', result);
         return result;
       } catch(e) {
         console.error('Sheet submission failed', e);
-        return null;
+        return {
+          status: 'error',
+          message: e.message || 'Network error'
+        };
       }
     }
 
@@ -380,9 +500,10 @@
       };
 
       // Auto-assign to agent
-      const agent = getNextAgent();
+      const agent = getNextAgent(ticket.language || '');
       if (agent) {
         ticket.assignedTo = agent.email;
+        ticket.assignedAgentName = agent.name;
         ticket.CreatedTime = new Date().toISOString();
         sendEmail(agent, ticket);
         showToast('✅ Ticket assigned to ' + agent.email);
@@ -391,7 +512,11 @@
       }
 
       // Submit to Google Sheet
-      await submitToGoogleSheet(ticket);
+      const sheetResult = await submitToGoogleSheet(ticket);
+      if (!sheetResult || sheetResult.status !== 'success') {
+        showToast('⚠ Sheet sync failed: ' + ((sheetResult && sheetResult.message) || 'Unknown error'));
+        return;
+      }
 
       document.getElementById('quickTicketForm').style.display = 'none';
       document.getElementById('successState').classList.add('show');

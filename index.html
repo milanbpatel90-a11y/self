@@ -324,11 +324,12 @@
         <div class="stack">
           <div class="panel">
             <div class="panel-header">
-              <h2>Add Available Agent</h2>
-              <p>Enter Agent Name, Agent Email Address, and Language. This list is used for round-robin auto assignment.</p>
+              <h2 id="agentFormTitle">Add Available Agent</h2>
+              <p id="agentFormDescription">Enter Agent Name, Agent Email Address, and Language. This list is used for round-robin auto assignment.</p>
             </div>
             <div class="panel-body">
               <form id="addAgentForm" class="form-grid">
+                <input type="hidden" id="agentEditId">
                 <div class="field">
                   <label for="agentName"><i class="fas fa-user"></i> Agent Name</label>
                   <input type="text" id="agentName" placeholder="Enter agent name" required>
@@ -341,7 +342,10 @@
                   <label for="agentLanguage"><i class="fas fa-language"></i> Agent Language</label>
                   <input type="text" id="agentLanguage" placeholder="English, Hindi, Gujarati" required>
                 </div>
-                <button type="submit" class="primary-btn"><i class="fas fa-user-plus"></i> Add Agent</button>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                  <button type="submit" id="agentFormSubmit" class="primary-btn"><i class="fas fa-user-plus"></i> Add Agent</button>
+                  <button type="button" id="agentFormCancel" class="secondary-btn" style="display: none;"><i class="fas fa-xmark"></i> Cancel Edit</button>
+                </div>
               </form>
             </div>
           </div>

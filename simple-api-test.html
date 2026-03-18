@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        
+        .button {
+            background: #4285f4;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        
+        .button:hover {
+            background: #3367d6;
+        }
+        
+        .debug-log {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 Simple API Test</h1>
+        
+        <div class="test-section">
+            <h2>Google Apps Script API Test</h2>
+            
+            <button class="button" id="getTestBtn">GET Test</button>
+            <button class="button" id="postTestBtn">POST Test</button>
+            
+            <div id="apiResults" class="debug-log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Testing Tips</h2>
+            <div class="status warning">
+                <strong>Common issues to check:</strong><br>
+                1. Google Apps Script is properly deployed as a Web App<br>
+                2. Deployment settings: "Anyone" has access<br>
+                3. Browser console for CORS errors<br>
+                4. Network tab in DevTools for detailed request/response<br>
+                5. Google Sheets permissions and ownership
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Google Apps Script URL from quick-ticket-api.js
+        const API_URL = "https://script.google.com/macros/s/AKfycbwGslRWDYm8wBtrVzAdhjOLIpT5b60LCSFtTbnUuW6qxD46-vtd-1odlM_B7vlzFpY/exec";
+        
+        // DOM elements
+        const getTestBtn = document.getElementById('getTestBtn');
+        const postTestBtn = document.getElementById('postTestBtn');
+        const apiResults = document.getElementById('apiResults');
+        
+        // Log function
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            apiResults.textContent += `[${timestamp}] ${message}\n`;
+            apiResults.scrollTop = apiResults.scrollHeight;
+        }
+        
+        // Clear log
+        function clearLog() {
+            apiResults.textContent = '';
+        }
+        
+        // GET test
+        getTestBtn.addEventListener('click', async () => {
+            clearLog();
+            log('=== GET Test ===');
+            log('Testing API endpoint...');
+            
+            try {
+                log('Making GET request...');
+                log(`API URL: ${API_URL}`);
+                
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    signal: AbortSignal.timeout(10000)
+                });
+                
+                log(`Response status: ${response.status}`);
+                log(`Response type: ${response.type}`);
+                
+                // Log all response headers
+                for (let [name, value] of response.headers) {
+                    log(`Header: ${name} = ${value}`);
+                }
+                
+                const data = await response.json();
+                log('Response data:');
+                log(JSON.stringify(data, null, 2));
+                
+            } catch (error) {
+                log('Error: ' + error.message);
+                log('Error stack:');
+                log(error.stack);
+            }
+            
+            log('=== Test Complete ===');
+        });
+        
+        // POST test
+        postTestBtn.addEventListener('click', async () => {
+            clearLog();
+            log('=== POST Test ===');
+            log('Testing API endpoint...');
+            
+            try {
+                const testData = {
+                    ticketId: 'TEST-TKT-001',
+                    mobile: '9876543210',
+                    product: 'POS',
+                    language: 'English',
+                    query: 'This is a test ticket',
+                    priority: 'High',
+                    status: 'Open',
+                    assignedTo: 'test@example.com',
+                    createdTime: new Date().toISOString()
+                };
+                
+                log('Sending test data:');
+                log(JSON.stringify(testData, null, 2));
+                
+                log('Making POST request...');
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8'
+                    },
+                    body: JSON.stringify(testData),
+                    signal: AbortSignal.timeout(10000)
+                });
+                
+                log(`Response status: ${response.status}`);
+                
+                // Log all response headers
+                for (let [name, value] of response.headers) {
+                    log(`Header: ${name} = ${value}`);
+                }
+                
+                const data = await response.json();
+                log('Response data:');
+                log(JSON.stringify(data, null, 2));
+                
+            } catch (error) {
+                log('Error: ' + error.message);
+                log('Error stack:');
+                log(error.stack);
+            }
+            
+            log('=== Test Complete ===');
+        });
+        
+        log('Page loaded successfully');
+        log('Click buttons to run tests');
+    </script>
+</body>
+</html>

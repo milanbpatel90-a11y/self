@@ -1,5 +1,5 @@
 // Google Apps Script Web App URL - REPLACE WITH YOUR DEPLOYED URL
-const API_URL = "https://script.google.com/macros/s/AKfycbwGslRWDYm8wBtrVzAdhjOLIpT5b60LCSFtTbnUuW6qxD46-vtd-1odlM_B7vlzFpY/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyqC6442w0hqOQga0vTOeO7BnoShm4j7DEPg-oxoo3lHtkdMEk03yHGePQbz7fkv_M/exec";
 
 // DB_KEYS - using Google Sheets via API
 const DB_KEYS = {
@@ -23,11 +23,7 @@ async function initializeData() {
       saveAvailableAgents();
     }
     
-    // Load rotation index
-    const savedIndex = localStorage.getItem(DB_KEYS.AGENT_ROTATION);
-    if (savedIndex) {
-      rotationIndex = parseInt(savedIndex, 10);
-    }
+    loadRotationState();
     
     console.log('✅ Data initialized');
   } catch (error) {
@@ -62,7 +58,7 @@ async function submitTicketToSheet(ticketData) {
 
 // Round-robin assignment functions
 let availableAgents = [];
-let rotationIndex = 0;
+let rotationState = {};
 let assignmentHistory = [];
 
 function loadRoundRobinData() {
@@ -71,21 +67,96 @@ function loadRoundRobinData() {
     availableAgents = JSON.parse(savedAgents);
   }
   
-  const savedIndex = localStorage.getItem(DB_KEYS.AGENT_ROTATION);
-  if (savedIndex) {
-    rotationIndex = parseInt(savedIndex, 10);
-  }
+  loadRotationState();
 }
 
 function saveAvailableAgents() {
   localStorage.setItem(DB_KEYS.AVAILABLE_AGENTS, JSON.stringify(availableAgents));
 }
 
-function saveRotationIndex() {
-  localStorage.setItem(DB_KEYS.AGENT_ROTATION, rotationIndex.toString());
+function loadRotationState() {
+  const savedRotation = localStorage.getItem(DB_KEYS.AGENT_ROTATION);
+  if (!savedRotation) {
+    rotationState = {};
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(savedRotation);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      rotationState = parsed;
+      return;
+    }
+  } catch (error) {
+    const legacyIndex = parseInt(savedRotation, 10);
+    if (!Number.isNaN(legacyIndex)) {
+      rotationState = { all: legacyIndex };
+      return;
+    }
+  }
+
+  rotationState = {};
 }
 
-function getNextAgent() {
+function saveRotationState() {
+  localStorage.setItem(DB_KEYS.AGENT_ROTATION, JSON.stringify(rotationState));
+}
+
+function normalizeLanguageKey(value) {
+  if (!value) return '';
+
+  const normalized = value.toString().trim().toLowerCase();
+  const aliases = {
+    en: 'english',
+    eng: 'english',
+    english: 'english',
+    hi: 'hindi',
+    hindi: 'hindi',
+    ta: 'tamil',
+    tamil: 'tamil',
+    bn: 'bengali',
+    bengali: 'bengali',
+    bangla: 'bengali',
+    gu: 'gujarati',
+    gujarati: 'gujarati',
+    mr: 'marathi',
+    marathi: 'marathi',
+    te: 'telugu',
+    telugu: 'telugu',
+    kn: 'kannada',
+    kannada: 'kannada',
+    ml: 'malayalam',
+    malayalam: 'malayalam',
+    pa: 'punjabi',
+    punjabi: 'punjabi'
+  };
+
+  return aliases[normalized] || normalized;
+}
+
+function normalizeLanguageList(value) {
+  if (!value) return [];
+  return value
+    .split(/[,&/|]+/)
+    .map(item => normalizeLanguageKey(item))
+    .filter(Boolean);
+}
+
+function agentSupportsLanguage(agent, language) {
+  const normalizedLanguage = normalizeLanguageKey(language);
+  if (!normalizedLanguage) return true;
+  const agentLanguages = normalizeLanguageList(agent.language || '');
+  if (agentLanguages.length === 0) return false;
+  return agentLanguages.includes(normalizedLanguage);
+}
+
+function getNextAgent(preferredLanguage = '') {
+  const savedAgents = localStorage.getItem(DB_KEYS.AVAILABLE_AGENTS);
+  if (savedAgents) {
+    availableAgents = JSON.parse(savedAgents);
+  }
+
+  loadRotationState();
   const activeAgents = availableAgents.filter(agent => agent.status === 'Active');
   
   if (activeAgents.length === 0) {
@@ -93,15 +164,27 @@ function getNextAgent() {
     return null;
   }
 
-  const agent = activeAgents[rotationIndex % activeAgents.length];
-  rotationIndex = (rotationIndex + 1) % activeAgents.length;
-  saveRotationIndex();
+  const normalizedLanguage = normalizeLanguageKey(preferredLanguage);
+  const rotationPool = normalizedLanguage
+    ? activeAgents.filter(agent => agentSupportsLanguage(agent, normalizedLanguage))
+    : activeAgents;
+
+  if (rotationPool.length === 0) {
+    console.warn('No active agents available for language:', preferredLanguage);
+    return null;
+  }
+
+  const rotationKey = normalizedLanguage || 'all';
+  const currentIndex = rotationState[rotationKey] || 0;
+  const agent = rotationPool[currentIndex % rotationPool.length];
+  rotationState[rotationKey] = (currentIndex + 1) % rotationPool.length;
+  saveRotationState();
 
   return agent;
 }
 
 function autoAssignTicket(ticket) {
-  const agent = getNextAgent();
+  const agent = getNextAgent(ticket.language || '');
   
   if (!agent) {
     return null;

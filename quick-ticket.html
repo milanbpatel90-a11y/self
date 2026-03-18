@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Ticket - Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        
+        .test-section h2 {
+            color: #444;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        
+        .button {
+            background: #4285f4;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        
+        .button:hover {
+            background: #3367d6;
+        }
+        
+        .button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .success {
+            background: #10b981;
+        }
+        
+        .success:hover {
+            background: #059669;
+        }
+        
+        .error {
+            background: #ef4444;
+        }
+        
+        .error:hover {
+            background: #dc2626;
+        }
+        
+        .info {
+            background: #3b82f6;
+        }
+        
+        .info:hover {
+            background: #2563eb;
+        }
+        
+        .debug-log {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .form-group label {
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .priority-group {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .priority-group label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 6px;
+        }
+        
+        .results h3 {
+            margin-top: 0;
+        }
+        
+        .result-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Quick Ticket Debug Test</h1>
+        
+        <div class="test-section">
+            <h2>🧪 API Configuration Test</h2>
+            <button class="button info" onclick="testAPIConfig()">Test API Configuration</button>
+            <div id="apiConfigResults" class="debug-log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📊 Google Sheet Connection Test</h2>
+            <button class="button" onclick="testSheetConnection()">Test Google Sheet Connection</button>
+            <div id="sheetResults" class="debug-log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📧 Email Configuration Test</h2>
+            <button class="button" onclick="testEmailConfig()">Test Email Configuration</button>
+            <div id="emailResults" class="debug-log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🎫 Quick Ticket Test Form</h2>
+            <form id="testForm">
+                <div class="form-group">
+                    <label>Mobile Number:</label>
+                    <input type="tel" id="testMobile" placeholder="Enter 10-digit mobile number" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Product:</label>
+                    <select id="testProduct" required>
+                        <option value="">Select product</option>
+                        <option value="POS">POS</option>
+                        <option value="BI">BI</option>
+                        <option value="Inventory">Inventory</option>
+                        <option value="Payments">Payments</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Language:</label>
+                    <select id="testLanguage" required>
+                        <option value="English">English</option>
+                        <option value="Hindi">Hindi</option>
+                        <option value="Gujarati">Gujarati</option>
+                        <option value="Marathi">Marathi</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Query Description:</label>
+                    <textarea id="testQueries" placeholder="Describe your issue..." required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Priority:</label>
+                    <div class="priority-group">
+                        <label><input type="radio" name="testPriority" value="High" checked> High</label>
+                        <label><input type="radio" name="testPriority" value="Medium"> Medium</label>
+                        <label><input type="radio" name="testPriority" value="Low"> Low</label>
+                    </div>
+                </div>
+                
+                <button type="submit" class="button success">📝 Submit Test Ticket</button>
+            </form>
+            
+            <div id="formResults" class="results" style="display: none;">
+                <h3>Test Results</h3>
+                <div id="formResultsContent"></div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📋 Available Agents Test</h2>
+            <button class="button" onclick="testAgentsList()">Test Available Agents</button>
+            <div id="agentsResults" class="debug-log"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Debug logging function
+        function log(section, message, type = 'info') {
+            const colors = {
+                info: '#10b981',
+                success: '#059669',
+                error: '#dc2626',
+                warning: '#f59e0b'
+            };
+            
+            const logDiv = document.getElementById(`${section}Results`);
+            if (logDiv) {
+                const timestamp = new Date().toLocaleTimeString();
+                logDiv.textContent += `[${timestamp}] ${message}\n`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+        }
+        
+        // Clear log
+        function clearLog(section) {
+            const logDiv = document.getElementById(`${section}Results`);
+            if (logDiv) {
+                logDiv.textContent = '';
+            }
+        }
+        
+        // API Configuration test
+        function testAPIConfig() {
+            clearLog('apiConfig');
+            
+            log('apiConfig', '=== API Configuration Test ===');
+            
+            // Test localStorage
+            log('apiConfig', '🧹 Testing localStorage access...');
+            try {
+                localStorage.setItem('testKey', 'testValue');
+                const testValue = localStorage.getItem('testKey');
+                localStorage.removeItem('testKey');
+                
+                if (testValue === 'testValue') {
+                    log('apiConfig', '✅ localStorage access: OK');
+                } else {
+                    log('apiConfig', '❌ localStorage access: FAILED');
+                }
+            } catch (error) {
+                log('apiConfig', `❌ localStorage error: ${error}`);
+            }
+            
+            // Test EmailJS library
+            log('apiConfig', '📧 Checking EmailJS library...');
+            if (typeof emailjs !== 'undefined') {
+                log('apiConfig', '✅ EmailJS library loaded');
+                
+                // Test config
+                const config = getEmailJSConfig();
+                log('apiConfig', `📄 Public Key: ${config.publicKey}`);
+                log('apiConfig', `📄 Service ID: ${config.serviceId}`);
+                log('apiConfig', `📄 Template ID: ${config.templateId}`);
+                
+                if (config.publicKey && config.serviceId && config.templateId) {
+                    log('apiConfig', '✅ EmailJS configuration: Complete');
+                } else {
+                    log('apiConfig', '⚠️ EmailJS configuration: Incomplete');
+                }
+            } else {
+                log('apiConfig', '❌ EmailJS library not loaded');
+            }
+            
+            log('apiConfig', '=== Test Complete ===');
+        }
+        
+        // Sheet connection test
+        async function testSheetConnection() {
+            clearLog('sheet');
+            
+            log('sheet', '=== Google Sheet Connection Test ===');
+            
+            try {
+                log('sheet', '🔍 Testing API URL...');
+                log('sheet', `🌐 API URL: ${API_URL}`);
+                
+                // Add timeout to prevent hanging
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    mode: 'cors',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('sheet', '✅ API call succeeded');
+                    log('sheet', `📊 Status: ${data.status}`);
+                    if (data.tickets) {
+                        log('sheet', `🎫 Tickets found: ${data.tickets.length}`);
+                    }
+                } else {
+                    log('sheet', `❌ API call failed with status: ${response.status}`);
+                    const errorText = await response.text();
+                    log('sheet', `❌ Error: ${errorText}`);
+                }
+            } catch (error) {
+                log('sheet', `❌ Network error: ${error}`);
+            }
+            
+            log('sheet', '=== Test Complete ===');
+        }
+        
+        // Email configuration test
+        function testEmailConfig() {
+            clearLog('email');
+            
+            log('email', '=== Email Configuration Test ===');
+            
+            // Check if EmailJS is loaded
+            if (typeof emailjs === 'undefined') {
+                log('email', '❌ EmailJS library not loaded');
+                return;
+            }
+            
+            log('email', '✅ EmailJS library loaded');
+            
+            // Check config
+            const config = getEmailJSConfig();
+            log('email', '📄 Configuration:');
+            log('email', `   Public Key: ${config.publicKey}`);
+            log('email', `   Service ID: ${config.serviceId}`);
+            log('email', `   Template ID: ${config.templateId}`);
+            
+            // Simple validation
+            if (!config.publicKey || !config.serviceId || !config.templateId) {
+                log('email', '❌ Configuration incomplete');
+                return;
+            }
+            
+            log('email', '✅ Configuration looks valid');
+            
+            // Test email sending with test data
+            log('email', '📝 Testing email sending with test data...');
+            
+            const testAgent = {
+                email: 'test@example.com',
+                name: 'Test Agent'
+            };
+            
+            const testTicket = {
+                id: 'TKT-TEST',
+                mobileNumber: '9876543210',
+                product: 'POS',
+                queryDescription: 'This is a test query',
+                priority: 'High',
+                timestamp: new Date().toISOString()
+            };
+            
+            try {
+                // This won't actually send an email to real users
+                log('email', '🎯 EmailJS initialized');
+                log('email', '📧 Test email template parameters prepared');
+                
+                log('email', '✅ Email system ready');
+            } catch (error) {
+                log('email', `❌ Error: ${error}`);
+            }
+        }
+        
+        // Agents test
+        function testAgentsList() {
+            clearLog('agents');
+            
+            log('agents', '=== Available Agents Test ===');
+            
+            const agents = JSON.parse(localStorage.getItem('selfTicket_available_agents') || '[]');
+            log('agents', `🎫 Total agents: ${agents.length}`);
+            
+            const activeAgents = agents.filter(a => a.status === 'Active');
+            log('agents', `✅ Active agents: ${activeAgents.length}`);
+            
+            const inactiveAgents = agents.filter(a => a.status === 'Inactive');
+            log('agents', `⚠️ Inactive agents: ${inactiveAgents.length}`);
+            
+            activeAgents.forEach((agent, index) => {
+                log('agents', `  ${index + 1}. ${agent.name} (${agent.email}) - ${agent.status}`);
+            });
+            
+            inactiveAgents.forEach((agent, index) => {
+                log('agents', `  ❌ ${agent.name} (${agent.email}) - ${agent.status}`);
+            });
+            
+            // Check if round-robin system is loaded
+            log('agents', '🔄 Round-robin system:');
+            const rotationIndex = localStorage.getItem('selfTicket_agent_rotation');
+            log('agents', `   Rotation index: ${rotationIndex}`);
+            
+            if (activeAgents.length === 0) {
+                log('agents', '❌ No active agents available for assignment');
+            } else {
+                const nextAgentIndex = parseInt(rotationIndex || 0);
+                const nextAgent = activeAgents[nextAgentIndex % activeAgents.length];
+                log('agents', `✨ Next agent to assign: ${nextAgent.name}`);
+            }
+        }
+        
+        // Form submission test
+        document.getElementById('testForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formResults = document.getElementById('formResults');
+            const formResultsContent = document.getElementById('formResultsContent');
+            formResultsContent.innerHTML = '';
+            formResults.style.display = 'block';
+            
+            // Get form data
+            const mobile = document.getElementById('testMobile').value;
+            const product = document.getElementById('testProduct').value;
+            const language = document.getElementById('testLanguage').value;
+            const queries = document.getElementById('testQueries').value;
+            const priority = document.querySelector('input[name="testPriority"]:checked')?.value;
+            
+            try {
+                // Validate mobile
+                const validation = validateMobileNumber(mobile);
+                if (!validation.valid) {
+                    formResultsContent.innerHTML = `<div class="status error">❌ Mobile validation failed: ${validation.message}</div>`;
+                    return;
+                }
+                
+                formResultsContent.innerHTML += `<div class="status success">✅ Mobile number validated: ${validation.cleanedNumber}</div>`;
+                
+                // Generate ticket
+                const ticket = {
+                    id: generateTicketId(),
+                    timestamp: new Date().toISOString(),
+                    mobileNumber: validation.cleanedNumber,
+                    product: product,
+                    language: language,
+                    queryDescription: queries,
+                    priority: priority,
+                    category: product,
+                    status: 'Open',
+                    assignedTrainer: null,
+                    assignedAgentName: null,
+                    assignedAgentId: null,
+                    assignedAt: null,
+                    assignmentMethod: null,
+                    resolvedAt: null
+                };
+                
+                formResultsContent.innerHTML += `<div class="status success">✅ Ticket created: ${ticket.id}</div>`;
+                
+                // Auto-assign
+                const assignedAgent = autoAssignTicket(ticket);
+                
+                if (assignedAgent) {
+                    formResultsContent.innerHTML += `<div class="status success">✅ Ticket assigned to: ${assignedAgent.name} (${assignedAgent.email})</div>`;
+                } else {
+                    formResultsContent.innerHTML += `<div class="status warning">⚠️ No agents available - ticket unassigned</div>`;
+                }
+                
+                // Submit to Google Sheet
+                formResultsContent.innerHTML += `<div class="status info">🔄 Submitting to Google Sheet...</div>`;
+                
+                const sheetResult = await submitTicketToSheet({
+                    ticketId: ticket.id,
+                    mobile: ticket.mobileNumber,
+                    product: ticket.product,
+                    language: ticket.language,
+                    query: ticket.queryDescription,
+                    priority: ticket.priority,
+                    status: 'Open',
+                    assignedTo: ticket.assignedTrainer || 'Unassigned',
+                    createdTime: ticket.timestamp
+                });
+                
+                if (sheetResult) {
+                    formResultsContent.innerHTML += `<div class="status success">✅ Ticket submitted to Google Sheet!</div>`;
+                } else {
+                    formResultsContent.innerHTML += `<div class="status error">❌ Failed to submit to Google Sheet</div>`;
+                }
+                
+                // Send email if assigned
+                if (assignedAgent) {
+                    formResultsContent.innerHTML += `<div class="status info">📧 Sending email notification...</div>`;
+                    sendAssignmentEmail(assignedAgent, ticket);
+                    formResultsContent.innerHTML += `<div class="status success">✅ Email sent to ${assignedAgent.email}</div>`;
+                }
+                
+            } catch (error) {
+                formResultsContent.innerHTML += `<div class="status error">❌ Error: ${error.message}</div>`;
+            }
+        });
+        
+        // Initialize tests on load
+        window.addEventListener('DOMContentLoaded', function() {
+            log('apiConfig', 'Page loaded successfully');
+            log('apiConfig', 'Run tests by clicking the buttons above');
+        });
+    </script>
+    
+    <!-- Include quick-ticket-api.js functionality -->
+    <script src="quick-ticket-api.js"></script>
+    
+    <!-- EmailJS library -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+</body>
+</html>

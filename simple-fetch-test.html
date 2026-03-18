@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Fetch Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        
+        .button {
+            background: #4285f4;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        
+        .button:hover {
+            background: #3367d6;
+        }
+        
+        .button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .debug-log {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 Simple Fetch Test</h1>
+        
+        <div class="test-section">
+            <h2>Google Apps Script API Test</h2>
+            <p>Testing fetch API call to your Google Apps Script:</p>
+            <button class="button" onclick="runFetchTest()">Run Fetch Test</button>
+            <div id="fetchResults" class="debug-log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>API URL Configuration</h2>
+            <p>Current API URL being tested:</p>
+            <div id="apiUrl" class="status success"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Google Apps Script URL from quick-ticket-api.js
+        const API_URL = "https://script.google.com/macros/s/AKfycbwGslRWDYm8wBtrVzAdhjOLIpT5b60LCSFtTbnUuW6qxD46-vtd-1odlM_B7vlzFpY/exec";
+        
+        // Log function
+        function log(message, type = 'info') {
+            const colors = {
+                info: '#10b981',
+                success: '#059669',
+                error: '#dc2626',
+                warning: '#f59e0b'
+            };
+            
+            const logDiv = document.getElementById('fetchResults');
+            if (logDiv) {
+                const timestamp = new Date().toLocaleTimeString();
+                logDiv.textContent += `[${timestamp}] ${message}\n`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+        }
+        
+        // Clear log
+        function clearLog() {
+            const logDiv = document.getElementById('fetchResults');
+            if (logDiv) {
+                logDiv.textContent = '';
+            }
+        }
+        
+        // Initialize
+        document.getElementById('apiUrl').textContent = API_URL;
+        
+        // Test function
+        async function runFetchTest() {
+            clearLog();
+            
+            log('=== Fetch API Test ===');
+            log('🔍 Testing API endpoint...');
+            log(`🌐 API URL: ${API_URL}`);
+            
+            try {
+                log('🚀 Making GET request...');
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    mode: 'cors',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                log(`✅ Response received with status: ${response.status}`);
+                
+                if (response.ok) {
+                    log('📄 Reading response data...');
+                    const data = await response.json();
+                    log('✅ JSON parsing successful');
+                    log(`📊 Status: ${data.status}`);
+                    if (data.tickets) {
+                        log(`🎫 Tickets found: ${data.tickets.length}`);
+                    }
+                    
+                    // Display full response
+                    log('');
+                    log('=== Full Response ===');
+                    log(JSON.stringify(data, null, 2));
+                } else {
+                    log(`❌ Response status: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text();
+                    log(`❌ Response body: ${errorText}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error}`);
+                
+                if (error.name === 'TypeError') {
+                    log('⚠️ Check if URL is reachable and CORS is enabled');
+                } else if (error.name === 'AbortError') {
+                    log('⚠️ Request timed out');
+                }
+                
+                log('');
+                log('=== Stack Trace ===');
+                log(error.stack);
+            }
+            
+            log('');
+            log('=== Test Complete ===');
+        }
+        
+        // Run test automatically on load (optional)
+        // window.addEventListener('DOMContentLoaded', runFetchTest);
+    </script>
+</body>
+</html>

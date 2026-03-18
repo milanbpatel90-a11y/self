@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tab Switching Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        
+        .tab-container {
+            max-width: 800px;
+            margin: 0 auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            background-color: #f1f1f1;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab-btn {
+            padding: 15px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-btn:hover {
+            background-color: #e6e6e6;
+            color: #333;
+        }
+        
+        .tab-btn.active {
+            color: #4285f4;
+            border-bottom-color: #4285f4;
+            background-color: white;
+        }
+        
+        .tab-content {
+            padding: 20px;
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .test-button {
+            background: #4285f4;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        
+        .test-button:hover {
+            background: #3367d6;
+        }
+        
+        #debug {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tab Switching Test</h1>
+    <p>Click tabs to switch between different views:</p>
+    
+    <div class="tab-container">
+        <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="queue">Queue</button>
+            <button class="tab-btn" data-tab="archive">Archive</button>
+            <button class="tab-btn" data-tab="agents">Agents</button>
+            <button class="tab-btn" data-tab="reports">Reports</button>
+            <button class="tab-btn" data-tab="settings">Settings</button>
+        </div>
+        
+        <div class="tab-contents">
+            <div id="queue" class="tab-content active">
+                <h2>Queue Tab</h2>
+                <p>Content for the queue tab.</p>
+                <div id="queue-content"></div>
+            </div>
+            
+            <div id="archive" class="tab-content">
+                <h2>Archive Tab</h2>
+                <p>Content for the archive tab.</p>
+            </div>
+            
+            <div id="agents" class="tab-content">
+                <h2>Agents Tab</h2>
+                <p>Content for the agents tab.</p>
+                <div id="availableAgentsList">
+                    <p>No agents found. Click "Add Test Agents" to populate.</p>
+                </div>
+            </div>
+            
+            <div id="reports" class="tab-content">
+                <h2>Reports Tab</h2>
+                <p>Content for the reports tab.</p>
+            </div>
+            
+            <div id="settings" class="tab-content">
+                <h2>Settings Tab</h2>
+                <p>Content for the settings tab.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <h3>Test Controls:</h3>
+        <button class="test-button" onclick="addTestAgents()">Add Test Agents</button>
+        <button class="test-button" onclick="updateAgentsList()">Update Agents List</button>
+        <button class="test-button" onclick="switchTab('agents')">Switch to Agents</button>
+        <button class="test-button" onclick="clearDebug()">Clear Debug</button>
+    </div>
+    
+    <div id="debug"></div>
+    
+    <script>
+        // Tab switching function
+        function switchTab(tabId) {
+            log('📌 switchTab called with tabId:', tabId);
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Add active class to clicked button
+            document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+            
+            // Remove active class from all content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabId).classList.add('active');
+            
+            // Call specific update functions for each tab
+            if (tabId === 'agents') {
+                log('🔄 Switching to agents tab - calling updateAgentsList()');
+                updateAgentsList();
+            }
+            
+            log('✅ switchTab completed');
+        }
+        
+        // Test agents array
+        let availableAgents = [];
+        
+        // Initialize tab buttons
+        document.querySelectorAll('.tab-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const tabId = button.getAttribute('data-tab');
+                switchTab(tabId);
+            });
+        });
+        
+        // Add test agents function
+        function addTestAgents() {
+            log('➕ Adding test agents');
+            availableAgents = [
+                { id: 1, name: 'John Doe', email: 'john@example.com', status: 'Active', assignedCount: 0 },
+                { id: 2, name: 'Jane Smith', email: 'jane@example.com', status: 'Active', assignedCount: 0 },
+                { id: 3, name: 'Mike Johnson', email: 'mike@example.com', status: 'Active', assignedCount: 0 }
+            ];
+            log('✅ Test agents added:', availableAgents);
+            updateAgentsList();
+        }
+        
+        // Update agents list function
+        function updateAgentsList() {
+            log('🔄 updateAgentsList called');
+            
+            const container = document.getElementById('availableAgentsList');
+            log('🔍 Container found:', !!container);
+            
+            if (!container) {
+                log('❌ Container not found');
+                return;
+            }
+            
+            if (availableAgents.length === 0) {
+                container.innerHTML = '<p>No agents found. Click "Add Test Agents" to populate.</p>';
+                log('⚠️ No agents to display');
+                return;
+            }
+            
+            const activeAgents = availableAgents.filter(a => a.status === 'Active');
+            const inactiveAgents = availableAgents.filter(a => a.status === 'Inactive');
+            
+            log(`📊 Active: ${activeAgents.length}, Inactive: ${inactiveAgents.length}`);
+            
+            let html = `
+                <div style="margin-bottom: 1.5rem;">
+                    <h4>Active Agents (${activeAgents.length})</h4>
+                    ${activeAgents.length === 0 ? '<p>No active agents</p>' : ''}
+                    ${activeAgents.map(agent => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f0fdf4; margin: 0.5rem 0; border-radius: 6px; border-left: 3px solid #10b981;">
+                            <div>
+                                <div style="font-weight: 600;">${agent.name}</div>
+                                <div style="font-size: 0.85rem; color: #6b7280;">${agent.email}</div>
+                                <div style="font-size: 0.8rem; color: #9ca3af;">Assigned: ${agent.assignedCount || 0} tickets</div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button onclick="toggleAgentStatus(${agent.id})" style="padding: 0.4rem 0.8rem; background: #f59e0b; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+                                    Pause
+                                </button>
+                                <button onclick="removeAgentFromList(${agent.id})" style="padding: 0.4rem 0.8rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            if (inactiveAgents.length > 0) {
+                html += `
+                    <div style="margin-bottom: 1.5rem;">
+                        <h4>Inactive Agents (${inactiveAgents.length})</h4>
+                        ${inactiveAgents.map(agent => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: #f3f4f6; margin: 0.5rem 0; border-radius: 6px; border-left: 3px solid #9ca3af; opacity: 0.7;">
+                                <div>
+                                    <div style="font-weight: 600; color: #6b7280;">${agent.name}</div>
+                                    <div style="font-size: 0.85rem; color: #9ca3af;">${agent.email}</div>
+                                </div>
+                                <button onclick="toggleAgentStatus(${agent.id})" style="padding: 0.4rem 0.8rem; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+                                    Reactivate
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+            log('✅ Agents list updated successfully');
+        }
+        
+        // Toggle agent status
+        function toggleAgentStatus(agentId) {
+            log('🔄 toggleAgentStatus called with id:', agentId);
+            const agent = availableAgents.find(a => a.id === agentId);
+            if (agent) {
+                agent.status = agent.status === 'Active' ? 'Inactive' : 'Active';
+                log(`✅ Agent ${agentId} status updated to: ${agent.status}`);
+                updateAgentsList();
+            }
+        }
+        
+        // Remove agent from list
+        function removeAgentFromList(agentId) {
+            log('🗑️ removeAgentFromList called with id:', agentId);
+            availableAgents = availableAgents.filter(a => a.id !== agentId);
+            log(`✅ Agent ${agentId} removed from list`);
+            updateAgentsList();
+        }
+        
+        // Debug logging function
+        function log(...args) {
+            const debugDiv = document.getElementById('debug');
+            const timestamp = new Date().toLocaleTimeString();
+            debugDiv.textContent += `[${timestamp}] ${args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ')}\n`;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+        }
+        
+        // Clear debug
+        function clearDebug() {
+            document.getElementById('debug').textContent = '';
+        }
+        
+        // Initialize with some debug info
+        document.addEventListener('DOMContentLoaded', () => {
+            log('✅ Page loaded successfully');
+            log('🔍 Tab buttons found:', document.querySelectorAll('.tab-btn').length);
+            log('🔍 Tab contents found:', document.querySelectorAll('.tab-content').length);
+        });
+    </script>
+</body>
+</html>

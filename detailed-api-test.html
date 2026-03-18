@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detailed API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        
+        .button {
+            background: #4285f4;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        
+        .button:hover {
+            background: #3367d6;
+        }
+        
+        .button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .debug-log {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .url-input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Detailed API Test</h1>
+        
+        <div class="test-section">
+            <h2>Google Apps Script API Test</h2>
+            
+            <div class="form-group">
+                <label>API URL:</label>
+                <input type="text" id="apiUrl" class="url-input" 
+                       value="https://script.google.com/macros/s/AKfycbwGslRWDYm8wBtrVzAdhjOLIpT5b60LCSFtTbnUuW6qxD46-vtd-1odlM_B7vlzFpY/exec">
+            </div>
+            
+            <p>Select test method:</p>
+            <button class="button" onclick="runGetTest()">GET Test</button>
+            <button class="button" onclick="runPostTest()">POST Test</button>
+            <button class="button" onclick="runCorsTest()">CORS Test</button>
+            
+            <div id="apiResults" class="debug-log"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Network Information</h2>
+            <div id="networkInfo" class="status info"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Testing Tips</h2>
+            <div id="tips" class="status warning">
+                <strong>Common issues to check:</strong><br>
+                1. Google Apps Script is properly deployed as a Web App<br>
+                2. Deployment settings: "Anyone" has access<br>
+                3. Browser console for CORS errors<br>
+                4. Network tab in DevTools for detailed request/response<br>
+                5. Google Sheets permissions and ownership
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Log function
+        function log(message, type = 'info') {
+            const colors = {
+                info: '#10b981',
+                success: '#059669',
+                error: '#dc2626',
+                warning: '#f59e0b'
+            };
+            
+            const logDiv = document.getElementById('apiResults');
+            if (logDiv) {
+                const timestamp = new Date().toLocaleTimeString();
+                logDiv.textContent += `[${timestamp}] ${message}\n`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+        }
+        
+        // Clear log
+        function clearLog() {
+            const logDiv = document.getElementById('apiResults');
+            if (logDiv) {
+                logDiv.textContent = '';
+            }
+        }
+        
+        // Display network information
+        function displayNetworkInfo() {
+            const networkInfo = document.getElementById('networkInfo');
+            if ('connection' in navigator) {
+                const connection = navigator.connection;
+                networkInfo.textContent = `Type: ${connection.effectiveType} | Downlink: ${connection.downlink}Mbps | Save Data: ${connection.saveData}`;
+            } else {
+                networkInfo.textContent = 'Network information not available';
+            }
+        }
+        
+        // Simple GET test
+        async function runGetTest() {
+            clearLog();
+            
+            const apiUrl = document.getElementById('apiUrl').value;
+            
+            log('=== GET Request Test ===');
+            log('🔍 Testing API endpoint...');
+            log(`🌐 API URL: ${apiUrl}`);
+            
+            try {
+                log('🚀 Making GET request...');
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json',
+                        'User-Agent': 'QuickTicket-API-Test/1.0'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                log(`✅ Response received with status: ${response.status}`);
+                
+                // Log all response headers
+                for (let [key, value] of response.headers.entries()) {
+                    log(`📝 Header: ${key}: ${value}`);
+                }
+                
+                if (response.ok) {
+                    log('📄 Reading response data...');
+                    const data = await response.json();
+                    log('✅ JSON parsing successful');
+                    log(`📊 Status: ${data.status}`);
+                    if (data.tickets) {
+                        log(`🎫 Tickets found: ${data.tickets.length}`);
+                    }
+                    
+                    // Display full response
+                    log('');
+                    log('=== Full Response ===');
+                    log(JSON.stringify(data, null, 2));
+                } else {
+                    log(`❌ Response status: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text();
+                    log(`❌ Response body: ${errorText}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error}`);
+                
+                if (error.name === 'TypeError') {
+                    log('⚠️ Check if URL is reachable and CORS is enabled');
+                } else if (error.name === 'AbortError') {
+                    log('⚠️ Request timed out');
+                }
+                
+                log('');
+                log('=== Stack Trace ===');
+                log(error.stack);
+            }
+            
+            log('');
+            log('=== Test Complete ===');
+        }
+        
+        // Simple POST test
+        async function runPostTest() {
+            clearLog();
+            
+            const apiUrl = document.getElementById('apiUrl').value;
+            
+            log('=== POST Request Test ===');
+            log('🔍 Testing API endpoint...');
+            log(`🌐 API URL: ${apiUrl}`);
+            
+            try {
+                log('🚀 Making POST request...');
+                
+                const testData = {
+                    ticketId: 'TEST-TKT-001',
+                    mobile: '9876543210',
+                    product: 'POS',
+                    language: 'English',
+                    query: 'This is a test ticket',
+                    priority: 'High',
+                    status: 'Open',
+                    assignedTo: 'test@example.com',
+                    createdTime: new Date().toISOString()
+                };
+                
+                log('📝 Test data:');
+                log(JSON.stringify(testData, null, 2));
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    signal: controller.signal,
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                        'User-Agent': 'QuickTicket-API-Test/1.0'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                clearTimeout(timeoutId);
+                
+                log(`✅ Response received with status: ${response.status}`);
+                
+                // Log all response headers
+                for (let [key, value] of response.headers.entries()) {
+                    log(`📝 Header: ${key}: ${value}`);
+                }
+                
+                if (response.ok) {
+                    log('📄 Reading response data...');
+                    const data = await response.json();
+                    log('✅ JSON parsing successful');
+                    log(`📊 Status: ${data.status}`);
+                    
+                    // Display full response
+                    log('');
+                    log('=== Full Response ===');
+                    log(JSON.stringify(data, null, 2));
+                } else {
+                    log(`❌ Response status: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text();
+                    log(`❌ Response body: ${errorText}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error}`);
+                
+                if (error.name === 'TypeError') {
+                    log('⚠️ Check if URL is reachable and CORS is enabled');
+                } else if (error.name === 'AbortError') {
+                    log('⚠️ Request timed out');
+                }
+                
+                log('');
+                log('=== Stack Trace ===');
+                log(error.stack);
+            }
+            
+            log('');
+            log('=== Test Complete ===');
+        }
+        
+        // CORS test
+        async function runCorsTest() {
+            clearLog();
+            
+            const apiUrl = document.getElementById('apiUrl').value;
+            
+            log('=== CORS Preflight Test ===');
+            log('🔍 Testing CORS support...');
+            log(`🌐 API URL: ${apiUrl}`);
+            
+            try {
+                log('🚀 Making OPTIONS request...');
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'OPTIONS',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                log(`✅ Response received with status: ${response.status}`);
+                
+                // Log all response headers
+                log('📝 Response Headers:');
+                for (let [key, value] of response.headers.entries()) {
+                    log(`  ${key}: ${value}`);
+                }
+                
+                // Check CORS headers
+                const corsHeaders = ['access-control-allow-origin', 'access-control-allow-methods', 'access-control-allow-headers'];
+                corsHeaders.forEach(header => {
+                    const value = response.headers.get(header);
+                    if (value) {
+                        log(`✅ ${header}: ${value}`);
+                    } else {
+                        log(`❌ ${header}: Not found`);
+                    }
+                });
+                
+                if (response.ok) {
+                    log('✅ CORS preflight successful');
+                } else {
+                    log('❌ CORS preflight failed');
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error}`);
+                
+                log('');
+                log('=== Stack Trace ===');
+                log(error.stack);
+            }
+            
+            log('');
+            log('=== Test Complete ===');
+        }
+        
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', function() {
+            displayNetworkInfo();
+            log('Page loaded successfully');
+            log('Run tests by clicking the button above');
+        });
+    </script>
+</body>
+</html>
