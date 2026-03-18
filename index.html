@@ -212,6 +212,10 @@
             <div class="panel-body">
               <form id="quickTicketForm" class="form-grid">
                 <div class="field">
+                  <label for="creatorEmail"><i class="fas fa-envelope"></i> Your Email</label>
+                  <input type="email" id="creatorEmail" placeholder="Enter your email to receive updates" required>
+                </div>
+                <div class="field">
                   <label for="mobile"><i class="fas fa-mobile-screen"></i> Mobile Number</label>
                   <input type="tel" id="mobile" placeholder="Enter 10-digit mobile number" maxlength="10" required>
                 </div>
@@ -225,10 +229,6 @@
                     <option value="Reservation">Reservation</option>
                     <option value="Retail">Retail</option>
                   </select>
-                </div>
-                <div class="field">
-                  <label for="creatorEmail"><i class="fas fa-envelope"></i> Your Email</label>
-                  <input type="email" id="creatorEmail" placeholder="Enter your email to receive updates" required>
                 </div>
                 <div class="field">
                   <label for="language"><i class="fas fa-language"></i> Language</label>
@@ -444,6 +444,24 @@
         </div>
 
         <div class="stack">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Saved Creator Email</h2>
+              <p>Manage the email locked for this device. Quick-ticket users can only change it from here.</p>
+            </div>
+            <div class="panel-body">
+              <form id="creatorEmailSettingsForm" class="form-grid">
+                <div class="field">
+                  <label for="savedCreatorEmail"><i class="fas fa-envelope-circle-check"></i> Saved Email</label>
+                  <input type="email" id="savedCreatorEmail" placeholder="No saved email yet">
+                </div>
+                <button type="submit" class="primary-btn"><i class="fas fa-floppy-disk"></i> Save Creator Email</button>
+                <button type="button" id="removeCreatorEmailBtn" class="secondary-btn"><i class="fas fa-trash"></i> Remove Saved Email</button>
+              </form>
+              <div id="creatorEmailSettingsStatus" class="helper-text">No creator email saved on this device.</div>
+            </div>
+          </div>
+
           <div class="panel">
             <div class="panel-header">
               <h2>EmailJS Configuration</h2>

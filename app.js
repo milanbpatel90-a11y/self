@@ -8,7 +8,8 @@ const DB_KEYS = {
   AGENT_ROTATION: 'selfTicket_agent_rotation',
   AVAILABLE_AGENTS: 'selfTicket_available_agents',
   GOOGLE_SCRIPT_URL: 'selfTicket_google_script_url',
-  LAST_QUICK_QUERY_RESPONSE: 'selfTicket_last_quick_query_response'
+  LAST_QUICK_QUERY_RESPONSE: 'selfTicket_last_quick_query_response',
+  CREATOR_PROFILE: 'selfTicket_creator_profile'
 };
 
 const DEFAULT_GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbDf1n2vQ57ybTAt2QAvTJFHhr4XCmT0DTejbDYKBvrmt8Tz9ZNYAsjnIY6AMGB6A/exec';
@@ -375,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateDashboardQueue();
   updateArchiveList();
   updateTrainerList();
+  setupCreatorEmailSettingsForm();
   setupQuickTicketForm();
   setupGoogleSheetsConfigForm();
   setupEmailJSConfigForm();
@@ -566,6 +568,103 @@ function validateEmailAddress(email) {
   return { valid: true, email: trimmed };
 }
 
+function getSavedCreatorProfile() {
+  const savedProfile = localStorage.getItem(DB_KEYS.CREATOR_PROFILE);
+  if (!savedProfile) return null;
+
+  try {
+    const parsed = JSON.parse(savedProfile);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveCreatorProfile(email, mobileNumber = '') {
+  const profile = {
+    email,
+    mobileNumber,
+    savedAt: new Date().toISOString()
+  };
+  localStorage.setItem(DB_KEYS.CREATOR_PROFILE, JSON.stringify(profile));
+  updateCreatorEmailSettingsUI();
+  applySavedCreatorProfileToQuickTicketForm();
+}
+
+function clearCreatorProfile() {
+  localStorage.removeItem(DB_KEYS.CREATOR_PROFILE);
+  updateCreatorEmailSettingsUI();
+  applySavedCreatorProfileToQuickTicketForm();
+}
+
+function applySavedCreatorProfileToQuickTicketForm() {
+  const creatorEmailInput = document.getElementById('creatorEmail');
+  if (!creatorEmailInput) return;
+
+  const savedProfile = getSavedCreatorProfile();
+  if (savedProfile && savedProfile.email) {
+    creatorEmailInput.value = savedProfile.email;
+    creatorEmailInput.readOnly = true;
+    creatorEmailInput.title = 'This email is locked for this device. Change it from the admin dashboard settings.';
+  } else {
+    creatorEmailInput.readOnly = false;
+    creatorEmailInput.title = '';
+  }
+}
+
+function updateCreatorEmailSettingsUI() {
+  const savedProfile = getSavedCreatorProfile();
+  const input = document.getElementById('savedCreatorEmail');
+  const status = document.getElementById('creatorEmailSettingsStatus');
+  const removeButton = document.getElementById('removeCreatorEmailBtn');
+
+  if (input) {
+    input.value = savedProfile?.email || '';
+  }
+
+  if (status) {
+    status.textContent = savedProfile?.email
+      ? `Saved email for this device: ${savedProfile.email}${savedProfile.mobileNumber ? ` | Last mobile: ${savedProfile.mobileNumber}` : ''}`
+      : 'No creator email saved on this device.';
+  }
+
+  if (removeButton) {
+    removeButton.disabled = !savedProfile?.email;
+  }
+}
+
+function setupCreatorEmailSettingsForm() {
+  const form = document.getElementById('creatorEmailSettingsForm');
+  const removeButton = document.getElementById('removeCreatorEmailBtn');
+
+  updateCreatorEmailSettingsUI();
+  applySavedCreatorProfileToQuickTicketForm();
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const input = document.getElementById('savedCreatorEmail');
+      const emailValidation = validateEmailAddress(input ? input.value : '');
+      if (!emailValidation.valid) {
+        showToast('âŒ ' + emailValidation.message, 'error');
+        return;
+      }
+
+      const existingProfile = getSavedCreatorProfile();
+      saveCreatorProfile(emailValidation.email, existingProfile?.mobileNumber || '');
+      showToast('âœ… Saved creator email updated for this device', 'success');
+    });
+  }
+
+  if (removeButton) {
+    removeButton.addEventListener('click', () => {
+      clearCreatorProfile();
+      showToast('âœ… Saved creator email removed for this device', 'success');
+    });
+  }
+}
+
 // ===== Setup Quick Ticket Form =====
 function setupQuickTicketForm() {
   const form = document.getElementById('quickTicketForm');
@@ -591,6 +690,13 @@ function setupQuickTicketForm() {
     const emailValidation = validateEmailAddress(creatorEmail);
     if (!emailValidation.valid) {
       showToast('âŒ ' + emailValidation.message, 'error');
+      return;
+    }
+
+    const savedProfile = getSavedCreatorProfile();
+    if (savedProfile?.email && savedProfile.email !== emailValidation.email) {
+      showToast('âŒ This device already has a saved creator email. Change it from Settings only.', 'error');
+      applySavedCreatorProfileToQuickTicketForm();
       return;
     }
 
@@ -626,6 +732,7 @@ function setupQuickTicketForm() {
 
     ticketsArray.push(newTicket);
     form.reset();
+    saveCreatorProfile(emailValidation.email, mobileValidation.cleanedNumber);
     updateDashboardQueue();
     saveToLocalStorage();
 

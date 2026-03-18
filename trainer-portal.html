@@ -344,6 +344,13 @@
       <!-- Form -->
       <form id="quickTicketForm">
         <div class="form-group">
+          <label for="creatorEmail">
+            <i class="fas fa-envelope"></i> Your Email
+          </label>
+          <input type="email" id="creatorEmail" placeholder="Enter your email to receive ticket updates" required>
+        </div>
+
+        <div class="form-group">
           <label for="mobile">
             <i class="fas fa-mobile-alt"></i> Mobile Number
           </label>
@@ -362,13 +369,6 @@
             <option value="Reservation">Reservation</option>
             <option value="Retail">Retail</option>
           </select>
-        </div>
-
-        <div class="form-group">
-          <label for="creatorEmail">
-            <i class="fas fa-envelope"></i> Your Email
-          </label>
-          <input type="email" id="creatorEmail" placeholder="Enter your email to receive ticket updates" required>
         </div>
 
         <div class="form-group">
@@ -447,7 +447,8 @@
       ASSIGNMENT_HISTORY: 'selfTicket_assignment_history',
       AGENT_ROTATION: 'selfTicket_agent_rotation',
       AVAILABLE_AGENTS: 'selfTicket_available_agents',
-      GOOGLE_SCRIPT_URL: 'selfTicket_google_script_url'
+      GOOGLE_SCRIPT_URL: 'selfTicket_google_script_url',
+      CREATOR_PROFILE: 'selfTicket_creator_profile'
     };
 
     const DEFAULT_GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbDf1n2vQ57ybTAt2QAvTJFHhr4XCmT0DTejbDYKBvrmt8Tz9ZNYAsjnIY6AMGB6A/exec';
@@ -807,6 +808,7 @@ Self-Ticket Support System
     // Form submission
     const form = document.getElementById('quickTicketForm');
     const successState = document.getElementById('successState');
+    applySavedCreatorProfile();
 
     // Mobile Number Validation Function
     function validateMobileNumber(mobileNumber) {
@@ -860,6 +862,42 @@ Self-Ticket Support System
       }
 
       return { valid: true, email: trimmed };
+    }
+
+    function getSavedCreatorProfile() {
+      const savedProfile = localStorage.getItem(DB_KEYS.CREATOR_PROFILE);
+      if (!savedProfile) return null;
+
+      try {
+        const parsed = JSON.parse(savedProfile);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function saveCreatorProfile(email, mobileNumber = '') {
+      localStorage.setItem(DB_KEYS.CREATOR_PROFILE, JSON.stringify({
+        email,
+        mobileNumber,
+        savedAt: new Date().toISOString()
+      }));
+      applySavedCreatorProfile();
+    }
+
+    function applySavedCreatorProfile() {
+      const creatorEmailInput = document.getElementById('creatorEmail');
+      if (!creatorEmailInput) return;
+
+      const savedProfile = getSavedCreatorProfile();
+      if (savedProfile && savedProfile.email) {
+        creatorEmailInput.value = savedProfile.email;
+        creatorEmailInput.readOnly = true;
+        creatorEmailInput.title = 'This email is locked for this device. Change or remove it from the admin dashboard.';
+      } else {
+        creatorEmailInput.readOnly = false;
+        creatorEmailInput.title = '';
+      }
     }
 
     async function submitTicketToGoogleSheet(ticket) {
@@ -926,6 +964,13 @@ Self-Ticket Support System
         showToast('Ã¢ÂÅ’ ' + emailValidation.message);
         return;
       }
+
+      const savedProfile = getSavedCreatorProfile();
+      if (savedProfile && savedProfile.email && savedProfile.email !== emailValidation.email) {
+        showToast('Ã¢ÂÅ’ This device already has a saved email. Change it from the admin dashboard only.');
+        applySavedCreatorProfile();
+        return;
+      }
       
       const tickets = getTickets();
       
@@ -961,6 +1006,7 @@ Self-Ticket Support System
       
       tickets.push(newTicket);
       saveTickets(tickets);
+      saveCreatorProfile(emailValidation.email, mobileValidation.cleanedNumber);
 
       const sheetResult = await submitTicketToGoogleSheet(newTicket);
       if (!sheetResult || sheetResult.status !== 'success') {
