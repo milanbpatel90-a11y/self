@@ -1,2 +1,2 @@
-    ./gradlew assembleDebug
+./gradlew assembleDebug    ./gradlew assembleDebug
     

@@ -65,6 +65,26 @@ function saveAvailableAgents() {
   localStorage.setItem(DB_KEYS.AVAILABLE_AGENTS, JSON.stringify(availableAgents));
 }
 
+function normalizeAgentRecord(agent) {
+  const numericId = Number(agent.id);
+
+  return {
+    ...agent,
+    id: Number.isNaN(numericId) ? agent.id : numericId,
+    name: agent.name || '',
+    email: agent.email || '',
+    language: agent.language || '',
+    status: agent.status === 'Inactive' ? 'Inactive' : 'Active',
+    assignedCount: Number(agent.assignedCount) || 0,
+    addedAt: agent.addedAt || new Date().toISOString()
+  };
+}
+
+function replaceAvailableAgents(nextAgents) {
+  availableAgents = nextAgents.map(normalizeAgentRecord);
+  saveAvailableAgents();
+}
+
 function loadRotationState() {
   const savedRotation = localStorage.getItem(DB_KEYS.AGENT_ROTATION);
   if (!savedRotation) {
@@ -215,9 +235,9 @@ function removeAgent(agentId) {
     agent.removedAt = new Date().toISOString();
     saveAvailableAgents();
     console.log('âœ… Agent removed:', agent.email);
-    return true;
+    return agent;
   }
-  return false;
+  return null;
 }
 
 // Set agent availability status
@@ -228,9 +248,9 @@ function setAgentStatus(agentId, status) {
     agent.statusChangedAt = new Date().toISOString();
     saveAvailableAgents();
     console.log('âœ… Agent status changed:', agent.email, '->', status);
-    return true;
+    return agent;
   }
-  return false;
+  return null;
 }
 
 // Reorder agents in rotation (move agent to front)
@@ -279,6 +299,7 @@ function recordAssignment(ticket, agent) {
   // Update agent's assigned count
   agent.assignedCount++;
   saveAvailableAgents();
+  syncAgentToGoogleSheet(agent, 'upsert', { silent: true });
 
   console.log('âœ… Assignment recorded:', record);
   return record;
@@ -339,7 +360,7 @@ function autoAssignTicket(ticket) {
 }
 
 // ===== Initialize Application =====
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   loadFromLocalStorage();
   
   // Initialize round-robin system
@@ -383,6 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupAgentManagementForm();
   updateCloudSyncUI();
   checkEmailJSConfiguration();
+  await loadAgentsFromGoogleSheet({ silent: true, showToastMessage: false });
   
   // Setup tab switching
   setupTabSwitching();
@@ -437,6 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('ðŸ“Š Dashboard is now visible - refreshing');
       loadFromLocalStorage();
       updateDashboardQueue();
+      loadAgentsFromGoogleSheet({ silent: true, showToastMessage: false });
       showToast('âœ… Dashboard synced', 'success');
     }
   });
@@ -876,7 +899,7 @@ function setupGoogleSheetsConfigForm() {
     input.value = getGoogleScriptUrl();
   }
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const scriptUrl = input ? input.value.trim() : '';
@@ -887,6 +910,7 @@ function setupGoogleSheetsConfigForm() {
 
     localStorage.setItem(DB_KEYS.GOOGLE_SCRIPT_URL, scriptUrl);
     updateCloudSyncUI();
+    await loadAgentsFromGoogleSheet({ silent: false, showToastMessage: false });
     showToast('Cloud sync enabled', 'success');
   });
 }
@@ -908,7 +932,7 @@ function buildGoogleSheetPayload(ticket) {
   };
 }
 
-async function submitTicketToGoogleSheet(ticket) {
+async function postToGoogleScript(payload) {
   const scriptUrl = getGoogleScriptUrl();
   if (!scriptUrl) {
     return { success: false, message: 'Cloud sync URL is not configured.' };
@@ -920,7 +944,7 @@ async function submitTicketToGoogleSheet(ticket) {
       headers: {
         'Content-Type': 'text/plain;charset=utf-8'
       },
-      body: JSON.stringify(buildGoogleSheetPayload(ticket))
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
@@ -932,19 +956,104 @@ async function submitTicketToGoogleSheet(ticket) {
       return { success: false, message: result.message || 'Cloud sync failed.' };
     }
 
-    const messageParts = ['Ticket synced to Google Sheets.'];
-    if (typeof result.emailStatus === 'string') {
-      messageParts.push(`Email: ${result.emailStatus}`);
-    }
-    if (result.emailMessage) {
-      messageParts.push(result.emailMessage);
-    }
-
-    return { success: true, message: messageParts.join(' ') };
+    return { success: true, result };
   } catch (error) {
     console.error('Cloud sync error:', error);
     return { success: false, message: 'Cloud sync failed. Check the Apps Script URL and deployment access.' };
   }
+}
+
+async function fetchAgentsFromGoogleSheet() {
+  const scriptUrl = getGoogleScriptUrl();
+  if (!scriptUrl) {
+    return { success: false, message: 'Cloud sync URL is not configured.' };
+  }
+
+  const separator = scriptUrl.includes('?') ? '&' : '?';
+
+  try {
+    const response = await fetch(`${scriptUrl}${separator}resource=agents`, {
+      method: 'GET'
+    });
+
+    if (!response.ok) {
+      return { success: false, message: `Agent sync failed with status ${response.status}.` };
+    }
+
+    const result = await response.json();
+    if (result.status !== 'success') {
+      return { success: false, message: result.message || 'Agent sync failed.' };
+    }
+
+    return { success: true, agents: Array.isArray(result.agents) ? result.agents : [] };
+  } catch (error) {
+    console.error('Agent fetch error:', error);
+    return { success: false, message: 'Unable to load agents from Google Sheets.' };
+  }
+}
+
+async function loadAgentsFromGoogleSheet(options = {}) {
+  const { silent = false, showToastMessage = false } = options;
+  const result = await fetchAgentsFromGoogleSheet();
+
+  if (!result.success) {
+    if (!silent) {
+      showCloudSyncStatus(result.message, 'error');
+    }
+    return result;
+  }
+
+  replaceAvailableAgents(result.agents);
+  updateAvailableAgentsList();
+
+  if (showToastMessage) {
+    showToast(`Loaded ${availableAgents.length} agents from Google Sheets`, 'success');
+  }
+
+  return result;
+}
+
+async function syncAgentToGoogleSheet(agent, action = 'upsert', options = {}) {
+  const { silent = false } = options;
+  const scriptUrl = getGoogleScriptUrl();
+
+  if (!scriptUrl) {
+    return { success: true, localOnly: true, message: 'Apps Script URL not configured. Agent saved locally only.' };
+  }
+
+  const payload = {
+    resource: 'agents',
+    action,
+    agent: {
+      ...agent,
+      id: String(agent.id)
+    }
+  };
+
+  const result = await postToGoogleScript(payload);
+  if (!result.success && !silent) {
+    showCloudSyncStatus(result.message, 'error');
+  }
+
+  return result;
+}
+
+async function submitTicketToGoogleSheet(ticket) {
+  const response = await postToGoogleScript(buildGoogleSheetPayload(ticket));
+  if (!response.success) {
+    return response;
+  }
+
+  const { result } = response;
+  const messageParts = ['Ticket synced to Google Sheets.'];
+  if (typeof result.emailStatus === 'string') {
+    messageParts.push(`Email: ${result.emailStatus}`);
+  }
+  if (result.emailMessage) {
+    messageParts.push(result.emailMessage);
+  }
+
+  return { success: true, message: messageParts.join(' ') };
 }
 
 async function syncAllTicketsToGoogleSheet() {
@@ -985,7 +1094,7 @@ function setupAgentManagementForm() {
   if (!form) return;
   const cancelButton = document.getElementById('agentFormCancel');
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const editId = document.getElementById('agentEditId').value.trim();
@@ -993,9 +1102,11 @@ function setupAgentManagementForm() {
     const email = document.getElementById('agentEmail').value.trim();
     const language = document.getElementById('agentLanguage').value.trim();
 
+    const parsedId = Number(editId);
+    const agentId = Number.isNaN(parsedId) ? editId : parsedId;
     const isSaved = editId
-      ? updateExistingAgent(Number(editId), name, email, language)
-      : addNewAgent(name, email, language);
+      ? await updateExistingAgent(agentId, name, email, language)
+      : await addNewAgent(name, email, language);
 
     if (isSaved) {
       resetAgentForm();
@@ -1846,31 +1957,36 @@ function updateAvailableAgentsList() {
 }
 
 // Toggle agent status between Active and Inactive
-function toggleAgentStatus(agentId) {
+async function toggleAgentStatus(agentId) {
   const agent = availableAgents.find(a => a.id === agentId);
   if (agent) {
     const newStatus = agent.status === 'Active' ? 'Inactive' : 'Active';
-    setAgentStatus(agentId, newStatus);
+    const updatedAgent = setAgentStatus(agentId, newStatus);
+    await syncAgentToGoogleSheet(updatedAgent, 'upsert');
     updateAvailableAgentsList();
     showToast('✅ Agent ' + (newStatus === 'Active' ? 'activated' : 'deactivated'), 'success');
   }
 }
 
-function activateAgent(agentId) {
-  if (setAgentStatus(agentId, 'Active')) {
+async function activateAgent(agentId) {
+  const updatedAgent = setAgentStatus(agentId, 'Active');
+  if (updatedAgent) {
+    await syncAgentToGoogleSheet(updatedAgent, 'upsert');
     updateAvailableAgentsList();
     showToast('✅ Agent activated', 'success');
   }
 }
 
-function deactivateAgent(agentId) {
-  if (setAgentStatus(agentId, 'Inactive')) {
+async function deactivateAgent(agentId) {
+  const updatedAgent = setAgentStatus(agentId, 'Inactive');
+  if (updatedAgent) {
+    await syncAgentToGoogleSheet(updatedAgent, 'upsert');
     updateAvailableAgentsList();
     showToast('✅ Agent inactivated', 'success');
   }
 }
 
-function deleteAgent(agentId) {
+async function deleteAgent(agentId) {
   const agent = availableAgents.find(a => a.id === agentId);
   if (!agent) return false;
 
@@ -1878,26 +1994,27 @@ function deleteAgent(agentId) {
   saveAvailableAgents();
   rotationState = {};
   saveRotationState();
+  const syncResult = await syncAgentToGoogleSheet(agent, 'delete');
 
   const editIdInput = document.getElementById('agentEditId');
   if (editIdInput && editIdInput.value === String(agentId)) {
     resetAgentForm();
   }
 
-  return true;
+  return syncResult.success;
 }
 
 // Remove agent from the list
-function removeAgentFromList(agentId) {
+async function removeAgentFromList(agentId) {
   if (confirm('Are you sure you want to remove this agent from the rotation?')) {
-    if (deleteAgent(agentId)) {
+    if (await deleteAgent(agentId)) {
       updateAvailableAgentsList();
       showToast('✅ Agent removed from rotation', 'success');
     }
   }
 }
 
-function addNewAgent(name, email, language) {
+async function addNewAgent(name, email, language) {
   if (!name || !email || !language) {
     showToast('âŒ Please provide name, email, and language', 'error');
     return false;
@@ -1916,8 +2033,12 @@ function addNewAgent(name, email, language) {
     return false;
   }
 
-  addAgent(name, email, language);
+  const newAgent = addAgent(name, email, language);
   updateAvailableAgentsList();
+  const syncResult = await syncAgentToGoogleSheet(newAgent, 'upsert');
+  if (!syncResult.success) {
+    return false;
+  }
   showToast('âœ… Agent added: ' + email, 'success');
   return true;
 }
@@ -1969,7 +2090,7 @@ function resetAgentForm() {
   if (cancelButton) cancelButton.style.display = 'none';
 }
 
-function updateExistingAgent(agentId, name, email, language) {
+async function updateExistingAgent(agentId, name, email, language) {
   if (!name || !email || !language) {
     showToast('âŒ Please provide name, email, and language', 'error');
     return false;
@@ -2002,6 +2123,10 @@ function updateExistingAgent(agentId, name, email, language) {
   };
 
   saveAvailableAgents();
+  const syncResult = await syncAgentToGoogleSheet(availableAgents[agentIndex], 'upsert');
+  if (!syncResult.success) {
+    return false;
+  }
   updateAvailableAgentsList();
   showToast('âœ… Agent updated: ' + email, 'success');
   return true;
